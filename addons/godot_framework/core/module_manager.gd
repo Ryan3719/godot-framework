@@ -9,6 +9,7 @@ var _insertion_order: Array[StringName] = []
 var _resolved_order: Array[StringName] = []
 var _initialized := false
 var _running := false
+var _terminated := false
 
 
 func _init(module_context: GFContext) -> void:
@@ -16,6 +17,8 @@ func _init(module_context: GFContext) -> void:
 
 
 func install(module: GFModule) -> Error:
+	if _terminated:
+		return _fail(ERR_ALREADY_IN_USE, "Terminated module managers cannot install modules.")
 	if _initialized or _running:
 		return _fail(ERR_ALREADY_IN_USE, "Modules cannot be installed after initialization.")
 	if module == null:
@@ -32,6 +35,8 @@ func install(module: GFModule) -> Error:
 
 
 func initialize_all() -> Error:
+	if _terminated:
+		return _fail(ERR_ALREADY_IN_USE, "Terminated module managers cannot be initialized.")
 	if _initialized or _running:
 		return _fail(ERR_ALREADY_IN_USE, "Modules are already initialized.")
 	var resolve_result := _resolve_dependencies()
@@ -49,6 +54,7 @@ func initialize_all() -> Error:
 			module._framework_shutdown()
 			for index in range(initialized.size() - 1, -1, -1):
 				initialized[index]._framework_shutdown()
+			_terminated = true
 			return _fail(result, "Module '%s' failed to initialize with error %d." % [id, result])
 		initialized.append(module)
 	_initialized = true
@@ -56,6 +62,8 @@ func initialize_all() -> Error:
 
 
 func start_all() -> Error:
+	if _terminated:
+		return _fail(ERR_ALREADY_IN_USE, "Terminated module managers cannot be started.")
 	if not _initialized:
 		return _fail(ERR_UNCONFIGURED, "Modules must be initialized before startup.")
 	if _running:
@@ -91,11 +99,14 @@ func physics_update(delta: float) -> void:
 
 
 func shutdown_all() -> void:
+	if _terminated:
+		return
 	for index in range(_resolved_order.size() - 1, -1, -1):
 		var module: GFModule = _modules[_resolved_order[index]]
 		module._framework_shutdown()
 	_running = false
 	_initialized = false
+	_terminated = true
 
 
 func get_module(module_id: StringName) -> GFModule:
@@ -104,6 +115,10 @@ func get_module(module_id: StringName) -> GFModule:
 
 func ordered_ids() -> Array[StringName]:
 	return _resolved_order.duplicate()
+
+
+func is_terminated() -> bool:
+	return _terminated
 
 
 func _resolve_dependencies() -> Error:

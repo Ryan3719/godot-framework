@@ -9,9 +9,13 @@ The framework bounds cross-frame work where untrusted production rates could oth
 | Queued events | `max_queued_events` total and `max_queued_events_per_frame` dispatches per frame |
 | HTTP | active plus queued request count, queued body bytes, response bytes, and timeout |
 | WebSocket | packets per frame, packet bytes, send high/low watermarks, and lifecycle timeouts |
-| Downloads | active concurrency, retry count, and streamed temporary files |
+| Threaded resources | `max_pending_threaded_requests` total and `max_threaded_requests_per_frame` polls per frame |
+| Downloads | `max_in_flight_tasks`, active concurrency, retained terminal history, retry count, and streamed temporary files |
+| Correlation tracking | `request_max_pending` unresolved request records |
 
 Defaults are conservative starting points, not universal tuning values. Profile realistic project payloads and exported target platforms before changing them.
+
+HTTP and download services retain terminal metadata so callers can inspect results after signals return. `http_max_finished_requests` and `max_finished_tasks` bound that history; once full, the oldest terminal records are evicted. Set either limit to zero when callers consume all results synchronously from signals. `clear_finished()` remains available for explicit earlier cleanup.
 
 ## Benchmark Runner
 

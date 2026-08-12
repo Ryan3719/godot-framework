@@ -21,7 +21,7 @@ func _init(
 	host.add_child(_root)
 	http = GFHTTPService.new(_root, settings, http_backend_factory)
 	websockets = GFWebSocketService.new(websocket_backend_factory)
-	requests = GFRequestTracker.new()
+	requests = GFRequestTracker.new(settings.request_max_pending)
 	requests.default_timeout_seconds = settings.request_timeout_seconds
 	for definition: GFWebSocketChannelDefinition in settings.websocket_channels:
 		websockets.register_channel(definition)

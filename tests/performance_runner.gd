@@ -61,7 +61,7 @@ func _benchmark_service_resolve() -> void:
 
 
 func _benchmark_request_tracking() -> void:
-	var tracker := GFRequestTracker.new()
+	var tracker := GFRequestTracker.new(10_000)
 	var ids: Array[int] = []
 	var started := Time.get_ticks_usec()
 	for _index in 10_000:

@@ -7,10 +7,15 @@ signal load_completed(path: String, resource: Resource)
 signal load_failed(path: String, error: Error)
 
 var cache_enabled := true
+var max_pending_requests: int
 var _cache: Dictionary = {}
 var _requests: Dictionary = {}
 var _lease_counts: Dictionary = {}
 var _retained: Dictionary = {}
+
+
+func _init(p_max_pending_requests := 128) -> void:
+	max_pending_requests = maxi(p_max_pending_requests, 1)
 
 
 func load(path: String, type_hint := "", cache_mode := ResourceLoader.CACHE_MODE_REUSE) -> Resource:
@@ -58,6 +63,8 @@ func request(path: String, type_hint := "", use_sub_threads := false) -> Error:
 		return OK
 	if _requests.has(path):
 		return ERR_ALREADY_IN_USE
+	if _requests.size() >= max_pending_requests:
+		return ERR_OUT_OF_MEMORY
 	var result := ResourceLoader.load_threaded_request(
 		path,
 		type_hint,

@@ -22,3 +22,5 @@ Every project-owned `GFModuleDefinition` must now set `declared_id` and `declare
 `GFEventBus.queue()` now returns `Error`. Existing calls that ignore the result continue to enqueue while capacity is available. Code that cannot tolerate a dropped queued event must handle `ERR_OUT_OF_MEMORY` and choose an application policy such as retry, backpressure, or durable storage.
 
 Review `GFFrameworkConfig.max_queued_events` after upgrading. Its default is `8192`, while `max_queued_events_per_frame` remains the independent per-frame dispatch budget.
+
+The 0.5 development defaults also bound pending threaded resource requests, in-flight downloads, retained HTTP/download terminal metadata, and unresolved correlation requests. Projects that previously accumulated unbounded work should handle the existing rejection sentinels (`ERR_OUT_OF_MEMORY` or ID `0`) and consume terminal metadata before automatic oldest-first eviction.

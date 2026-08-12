@@ -29,6 +29,7 @@ var _backend_factory: Callable
 var _queue: Array[int] = []
 var _tasks: Dictionary = {}
 var _active: Dictionary = {}
+var _finished_order: Array[int] = []
 var _next_id := 1
 var _queued_body_bytes := 0
 var _dispatching := false
@@ -126,6 +127,7 @@ func cancel(request_id: int) -> bool:
 	task.state = TaskState.CANCELLED
 	task.body = PackedByteArray()
 	task.tls_options = null
+	_record_finished(request_id)
 	request_cancelled.emit(request_id, task.tag)
 	_dispatch()
 	return true
@@ -165,6 +167,7 @@ func clear_finished() -> int:
 		if int((_tasks[request_id] as Dictionary).state) in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
 			_tasks.erase(request_id)
 			removed += 1
+	_finished_order.clear()
 	return removed
 
 
@@ -178,6 +181,7 @@ func shutdown() -> void:
 	_queue.clear()
 	_active.clear()
 	_tasks.clear()
+	_finished_order.clear()
 	_queued_body_bytes = 0
 	_backend_factory = Callable()
 	_settings = null
@@ -188,7 +192,7 @@ func _dispatch() -> void:
 	if _dispatching or _closed or _settings == null:
 		return
 	_dispatching = true
-	while _active.size() < _settings.http_max_concurrent and not _queue.is_empty():
+	while not _closed and _settings != null and _active.size() < _settings.http_max_concurrent and not _queue.is_empty():
 		var request_id := _queue.pop_front()
 		if task_state(request_id) != TaskState.QUEUED:
 			continue
@@ -252,6 +256,7 @@ func _on_backend_completed(
 	task.response_body = body
 	task.body = PackedByteArray()
 	task.tls_options = null
+	_record_finished(request_id)
 	request_completed.emit(request_id, response_code, headers, body, task.tag)
 	_dispatch()
 
@@ -274,8 +279,15 @@ func _finish_failure(request_id: int, error: Error, result: int, response_code: 
 	task.response_code = response_code
 	task.body = PackedByteArray()
 	task.tls_options = null
+	_record_finished(request_id)
 	request_failed.emit(request_id, error, result, response_code, task.tag)
 	_dispatch()
+
+
+func _record_finished(request_id: int) -> void:
+	_finished_order.append(request_id)
+	while _finished_order.size() > _settings.http_max_finished_requests:
+		_tasks.erase(_finished_order.pop_front())
 
 
 func _create_backend() -> GFHTTPRequestBackend:

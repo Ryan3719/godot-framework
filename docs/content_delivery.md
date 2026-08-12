@@ -47,6 +47,8 @@ Sign the SHA-256 digest of the exact manifest bytes with the release RSA private
 4. Call `activate_release(release_id)` to persist the active/previous pointer.
 5. Restart when `restart_required` is true. The content module mounts the active release during its next startup.
 
+The download service rejects new work when `GFDownloadSettings.max_in_flight_tasks` is reached. Completed, failed, and cancelled metadata remains queryable until `clear_finished()` runs or the bounded `max_finished_tasks` history evicts the oldest record.
+
 If startup validation or mounting fails, the activation pointer is restored to the previous release. If at least one PCK was already mounted, the process is tainted because Godot cannot unload it; further mounts are rejected and the application must restart.
 
 ## Threat Model

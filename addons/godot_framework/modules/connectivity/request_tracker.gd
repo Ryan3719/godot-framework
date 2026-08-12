@@ -7,13 +7,20 @@ signal request_timed_out(correlation_id: int, context: Variant)
 signal request_cancelled(correlation_id: int, context: Variant)
 
 var default_timeout_seconds := 15.0
+var max_pending_requests: int
 
 var _pending: Dictionary = {}
 var _next_id := 1
 
 
+func _init(p_max_pending_requests := 4096) -> void:
+	max_pending_requests = maxi(p_max_pending_requests, 1)
+
+
 func begin(timeout_seconds := -1.0, context: Variant = null) -> int:
 	if timeout_seconds < -1.0:
+		return 0
+	if _pending.size() >= max_pending_requests:
 		return 0
 	var correlation_id := _next_id
 	_next_id += 1

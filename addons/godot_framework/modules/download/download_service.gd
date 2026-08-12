@@ -25,8 +25,10 @@ var _backend_factory: Callable
 var _queue: Array[int] = []
 var _tasks: Dictionary = {}
 var _active: Dictionary = {}
+var _finished_order: Array[int] = []
 var _next_id := 1
 var _dispatching := false
+var _closed := false
 
 
 func _init(host: Node, settings: GFDownloadSettings, backend_factory := Callable()) -> void:
@@ -45,6 +47,8 @@ func enqueue(
 	headers := PackedStringArray(),
 ) -> int:
 	last_error = ""
+	if _closed or _settings == null:
+		return _fail_id("Download service is shut down.")
 	var normalized_path := _normalize_relative_path(relative_path)
 	var normalized_hash := expected_sha256.to_lower()
 	if not (url.begins_with("http://") or url.begins_with("https://")):
@@ -55,6 +59,8 @@ func enqueue(
 		return _fail_id("Expected download size cannot be less than -1.")
 	if not normalized_hash.is_empty() and not _is_sha256(normalized_hash):
 		return _fail_id("Expected SHA-256 must contain exactly 64 hexadecimal characters.")
+	if _queue.size() + _active.size() >= _settings.max_in_flight_tasks:
+		return _fail_id("Download task queue is full.")
 
 	var task_id := _next_id
 	_next_id += 1
@@ -83,6 +89,8 @@ func enqueue(
 
 
 func update(_delta: float = 0.0) -> void:
+	if _closed:
+		return
 	for task_id: int in _active.keys():
 		var backend := _active.get(task_id) as GFDownloadBackend
 		if backend == null or not is_instance_valid(backend):
@@ -113,6 +121,7 @@ func cancel(task_id: int) -> bool:
 	_remove_file(task.temp_path)
 	task.state = TaskState.CANCELLED
 	task.error = ERR_SKIP
+	_record_finished(task_id)
 	task_cancelled.emit(task_id)
 	return true
 
@@ -141,16 +150,21 @@ func clear_finished() -> int:
 		if int((_tasks[task_id] as Dictionary).state) in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
 			_tasks.erase(task_id)
 			removed += 1
+	_finished_order.clear()
 	return removed
 
 
 func shutdown() -> void:
+	if _closed:
+		return
+	_closed = true
 	for task_id: int in _tasks.keys():
 		if int((_tasks[task_id] as Dictionary).state) in [TaskState.QUEUED, TaskState.RUNNING]:
 			cancel(task_id)
 	_queue.clear()
 	_active.clear()
 	_tasks.clear()
+	_finished_order.clear()
 	if is_instance_valid(_root):
 		_root.queue_free()
 	_root = null
@@ -159,10 +173,10 @@ func shutdown() -> void:
 
 
 func _dispatch() -> void:
-	if _dispatching or _settings == null:
+	if _dispatching or _closed or _settings == null:
 		return
 	_dispatching = true
-	while _active.size() < _settings.max_concurrent and not _queue.is_empty():
+	while not _closed and _settings != null and _active.size() < _settings.max_concurrent and not _queue.is_empty():
 		var task_id := _queue.pop_front()
 		if task_state(task_id) != TaskState.QUEUED:
 			continue
@@ -235,6 +249,7 @@ func _on_backend_completed(
 		return
 	task.state = TaskState.COMPLETED
 	task.error = OK
+	_record_finished(task_id)
 	task_completed.emit(task_id, task.target_path)
 	_dispatch()
 
@@ -261,8 +276,15 @@ func _fail_or_retry(
 		task_retry_scheduled.emit(task_id, int(task.attempts) + 1, error, response_code)
 		return
 	task.state = TaskState.FAILED
+	_record_finished(task_id)
 	task_failed.emit(task_id, error, response_code)
 	_dispatch()
+
+
+func _record_finished(task_id: int) -> void:
+	_finished_order.append(task_id)
+	while _finished_order.size() > _settings.max_finished_tasks:
+		_tasks.erase(_finished_order.pop_front())
 
 
 func _validate_file(task: Dictionary) -> Error:

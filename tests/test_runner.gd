@@ -163,6 +163,13 @@ func _test_module_dependencies_and_lifecycle() -> void:
 	_expect(manager.ordered_ids() == [&"provider", &"consumer"], "Dependencies are topologically sorted")
 	_expect(manager.start_all() == OK, "Initialized modules start")
 	manager.shutdown_all()
+	_expect(manager.is_terminated(), "Module manager becomes terminal after shutdown")
+	_expect(manager.initialize_all() == ERR_ALREADY_IN_USE, "Terminated module manager cannot be restarted")
+	_expect(manager.start_all() == ERR_ALREADY_IN_USE, "Terminated module manager cannot be started")
+	_expect(
+		manager.install(GFTrackingTestModule.new().setup(&"after_shutdown", [], trace)) == ERR_ALREADY_IN_USE,
+		"Terminated module manager cannot install new modules",
+	)
 	_expect(
 		trace == [
 			"initialize:provider",
@@ -660,7 +667,10 @@ func _test_localization_service() -> void:
 
 
 func _test_resource_service() -> void:
-	var resources := GFResourceService.new()
+	var invalid_settings := GFResourceSettings.new()
+	invalid_settings.max_pending_threaded_requests = 0
+	_expect(not invalid_settings.validate().is_empty(), "Resource settings reject zero pending capacity")
+	var resources := GFResourceService.new(1)
 	var config_path := "res://addons/godot_framework/config/default_framework_config.tres"
 	var loaded := resources.load(config_path)
 	_expect(loaded is GFFrameworkConfig, "Resource service loads typed Godot resources")
@@ -714,6 +724,10 @@ func _test_resource_service() -> void:
 		resources.request("res://tests/fixtures/transition_target.tscn", "PackedScene") == OK,
 		"Threaded resource request starts",
 	)
+	_expect(
+		resources.request("res://tests/fixtures/tracking_view.tscn", "PackedScene") == ERR_OUT_OF_MEMORY,
+		"Threaded resource queue rejects requests above capacity",
+	)
 	for _index in range(120):
 		resources.poll()
 		if async_completed[0]:
@@ -729,9 +743,70 @@ func _test_download_service() -> void:
 	settings.base_directory = base_directory
 	settings.max_concurrent = 2
 	settings.retry_count = 1
+	var bounded_settings := settings.duplicate() as GFDownloadSettings
+	bounded_settings.max_concurrent = 1
+	bounded_settings.max_in_flight_tasks = 1
+	bounded_settings.max_finished_tasks = 1
+	var bounded_plans: Array[Dictionary] = [
+		{"auto_complete": false},
+		{"auto_complete": false},
+	]
+	var bounded_downloads := GFDownloadService.new(
+		self,
+		bounded_settings,
+		func(): return GFTestDownloadBackend.new().setup(bounded_plans.pop_front()),
+	)
+	var bounded_first := bounded_downloads.enqueue("https://example.test/bounded-first", "bounded/first.bin")
+	_expect(
+		bounded_first > 0
+		and bounded_downloads.enqueue("https://example.test/bounded-second", "bounded/second.bin") == 0,
+		"Download queue rejects tasks above in-flight capacity",
+	)
+	bounded_downloads.update()
+	bounded_downloads.cancel(bounded_first)
+	var bounded_second := bounded_downloads.enqueue("https://example.test/bounded-second", "bounded/second.bin")
+	bounded_downloads.update()
+	bounded_downloads.cancel(bounded_second)
+	_expect(
+		bounded_downloads.task_info(bounded_first).is_empty()
+		and bounded_downloads.task_state(bounded_second) == GFDownloadService.TaskState.CANCELLED,
+		"Download history automatically evicts the oldest terminal task",
+	)
+	bounded_downloads.shutdown()
+	var reentrant_directory := "user://gf_download_reentrant_tests"
+	var reentrant_settings := GFDownloadSettings.new()
+	reentrant_settings.base_directory = reentrant_directory
+	var reentrant_downloads := GFDownloadService.new(
+		self,
+		reentrant_settings,
+		func(): return GFTestDownloadBackend.new().setup({"data": PackedByteArray()}),
+	)
+	var reentrant_downloads_weak: WeakRef = weakref(reentrant_downloads)
+	reentrant_downloads.task_completed.connect(
+		func(_task_id: int, _target_path: String) -> void:
+			var owned: GFDownloadService = reentrant_downloads_weak.get_ref() as GFDownloadService
+			if owned != null:
+				owned.shutdown(),
+	)
+	var reentrant_id := reentrant_downloads.enqueue("https://example.test/reentrant", "completed.bin")
+	reentrant_downloads.update()
+	await get_tree().process_frame
+	_expect(
+		reentrant_id > 0 and reentrant_downloads.enqueue("https://example.test/closed", "closed.bin") == 0,
+		"Download completion callbacks can shut down their owning service",
+	)
+	DirAccess.remove_absolute(reentrant_directory.path_join("completed.bin"))
+	DirAccess.remove_absolute(reentrant_directory)
 	var unsafe_download_settings := GFDownloadSettings.new()
 	unsafe_download_settings.base_directory = "user://../outside"
 	_expect(not unsafe_download_settings.validate().is_empty(), "Download settings reject user directory escape")
+	var invalid_download_capacity := GFDownloadSettings.new()
+	invalid_download_capacity.max_concurrent = 2
+	invalid_download_capacity.max_in_flight_tasks = 1
+	_expect(
+		not invalid_download_capacity.validate().is_empty(),
+		"Download settings reject in-flight capacity below concurrency",
+	)
 	var payload := "download payload".to_utf8_buffer()
 	var hasher := HashingContext.new()
 	hasher.start(HashingContext.HASH_SHA256)
@@ -809,6 +884,8 @@ func _test_download_service() -> void:
 	_expect(downloads.task_state(cancelled_id) == GFDownloadService.TaskState.CANCELLED, "Cancelled download reaches terminal state")
 	_expect(not FileAccess.file_exists(base_directory.path_join("content/cancel.bin")), "Cancelled download removes partial file")
 	_expect(downloads.clear_finished() == 4, "Finished download history can be cleared")
+	downloads.shutdown()
+	_expect(downloads.enqueue("https://example.test/closed", "closed.bin") == 0, "Shut down download service rejects new tasks")
 	downloads.shutdown()
 	await get_tree().process_frame
 	DirAccess.remove_absolute(base_directory.path_join("content/first.bin"))
@@ -983,6 +1060,12 @@ func _test_connectivity_service() -> void:
 	invalid_capacity.http_max_concurrent = 2
 	invalid_capacity.http_max_in_flight_requests = 1
 	_expect(not invalid_capacity.validate().is_empty(), "Connectivity settings reject in-flight capacity below concurrency")
+	var invalid_http_history := GFConnectivitySettings.new()
+	invalid_http_history.http_max_finished_requests = -1
+	_expect(not invalid_http_history.validate().is_empty(), "Connectivity settings reject negative HTTP history capacity")
+	var invalid_request_capacity := GFConnectivitySettings.new()
+	invalid_request_capacity.request_max_pending = 0
+	_expect(not invalid_request_capacity.validate().is_empty(), "Connectivity settings reject zero correlation capacity")
 	var invalid_channel := GFWebSocketChannelDefinition.new()
 	invalid_channel.channel_id = &"invalid"
 	invalid_channel.url = "https://example.test/socket"
@@ -991,6 +1074,24 @@ func _test_connectivity_service() -> void:
 	default_channel.channel_id = &"default"
 	default_channel.url = "wss://example.test/socket"
 	_expect(default_channel.validate().is_empty(), "WebSocket channel defaults form a valid bounded configuration")
+	var reentrant_settings := GFConnectivitySettings.new()
+	reentrant_settings.root_name = "ReentrantHTTPTest"
+	var reentrant_factory := GFConnectivityTestBackendFactory.new()
+	reentrant_factory.http_plans = [{}]
+	var reentrant_http := GFHTTPService.new(self, reentrant_settings, reentrant_factory.create_http)
+	var reentrant_http_weak: WeakRef = weakref(reentrant_http)
+	reentrant_http.request_completed.connect(
+		func(_id: int, _code: int, _headers: PackedStringArray, _body: PackedByteArray, _tag: StringName) -> void:
+			var owned: GFHTTPService = reentrant_http_weak.get_ref() as GFHTTPService
+			if owned != null:
+				owned.shutdown(),
+	)
+	var reentrant_http_id := reentrant_http.request("https://example.test/reentrant")
+	(reentrant_factory.created_http[0] as GFTestHTTPRequestBackend).complete()
+	_expect(
+		reentrant_http_id > 0 and reentrant_http.request("https://example.test/closed") == 0,
+		"HTTP completion callbacks can shut down their owning service",
+	)
 
 	var settings := GFConnectivitySettings.new()
 	settings.root_name = "ConnectivityServiceTest"
@@ -999,6 +1100,7 @@ func _test_connectivity_service() -> void:
 	settings.http_request_body_limit_bytes = 8
 	settings.http_max_queued_body_bytes = 8
 	settings.http_response_body_limit_bytes = 32
+	settings.http_max_finished_requests = 2
 	settings.http_timeout_seconds = 0.5
 	settings.request_timeout_seconds = 0.5
 	var factory := GFConnectivityTestBackendFactory.new()
@@ -1078,9 +1180,25 @@ func _test_connectivity_service() -> void:
 		and failed_http.back().error == ERR_OUT_OF_MEMORY,
 		"HTTP service enforces response limit across custom backends",
 	)
-	_expect(service.http.clear_finished() == 4, "HTTP service can clear terminal request history")
+	_expect(
+		service.http.task_info(first_id).is_empty() and service.http.task_info(second_id).is_empty(),
+		"HTTP history automatically evicts the oldest terminal requests",
+	)
+	_expect(service.http.clear_finished() == 2, "HTTP service clears retained terminal request history")
 
 	var tracker := service.requests
+	var bounded_tracker := GFRequestTracker.new(2)
+	var bounded_correlation_a := bounded_tracker.begin(0.0)
+	var bounded_correlation_b := bounded_tracker.begin(0.0)
+	_expect(
+		bounded_correlation_a > 0
+		and bounded_correlation_b > bounded_correlation_a
+		and bounded_tracker.begin(0.0) == 0,
+		"Correlation tracker rejects requests above pending capacity",
+	)
+	bounded_tracker.resolve(bounded_correlation_a)
+	_expect(bounded_tracker.begin(0.0) > 0, "Correlation tracker accepts work after capacity is released")
+	bounded_tracker.clear()
 	var resolved: Array[int] = []
 	var timed_out: Array[int] = []
 	var cancelled: Array[int] = []

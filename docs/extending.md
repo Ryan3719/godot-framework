@@ -6,6 +6,8 @@ Extend `GFModule` and implement at least a non-empty `module_id()`. Declare ever
 
 Do not assume `start()` will run. Both `initialize()` and `start()` can fail, and the manager calls `shutdown()` on partially initialized modules during rollback.
 
+`GFModuleManager` is intentionally single-use. After `shutdown_all()` or a lifecycle failure, create a new manager and fresh module instances. A stopped module is not reset to `CREATED` because arbitrary module shutdown cannot be reversed safely.
+
 ```gdscript
 class_name ExampleModule
 extends GFModule
@@ -57,6 +59,8 @@ Create a `GFModuleDefinition`, assign the following fields, and append it to the
 The declaration is intentionally redundant. Editor validation can inspect it without instantiating runtime modules, while boot verifies it against the module script and refuses mismatches. Keep both sides synchronized when an ID or dependency changes.
 
 The default configuration already contains disabled definitions for UI, audio, input, localization, download, content, tables, and connectivity. Duplicate the framework and relevant settings resources outside `addons/`, then enable the definitions in the project copy. Do not edit addon defaults because an upgrade can replace them.
+
+Disabled means no runtime service, node, or side effect is created. It does not mean the module files are absent from the addon package: the default configuration references every built-in definition. The current distribution is a single versioned addon, not a collection of independently installable subpackages.
 
 For UI, keep layers and route metadata in `GFUISettings`, and keep concrete scenes and application behavior in the project. For input, list only actions the framework may rebind. For localization, configure the supported locale allowlist and fallback explicitly. Audio groups must reference buses that exist in the project.
 

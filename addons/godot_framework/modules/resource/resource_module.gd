@@ -22,7 +22,7 @@ func initialize() -> Error:
 	module_settings = settings as GFResourceSettings
 	if module_settings == null:
 		module_settings = GFResourceSettings.new()
-	service = GFResourceService.new()
+	service = GFResourceService.new(module_settings.max_pending_threaded_requests)
 	service.cache_enabled = module_settings.cache_loaded_resources
 	return context.services.register(GFServiceIds.RESOURCES, service)
 

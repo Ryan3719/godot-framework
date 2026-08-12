@@ -24,7 +24,7 @@ Status: implemented in the current development branch. These modules are present
 - Localization facade over Godot `TranslationServer` with locale fallback, owned translations, formatting, and content validation
 - Module lifecycle integration tests and headless audio injection boundary
 
-Exit criteria: modules can be removed independently and do not ship branded screens or concrete game flow.
+Exit criteria: modules can be enabled independently at runtime and do not ship branded screens or concrete game flow. Physical per-module packages remain deferred until real consumer projects demonstrate that their versioning and dependency cost is justified.
 
 ## 0.3 Content Delivery
 

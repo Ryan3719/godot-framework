@@ -14,11 +14,14 @@ All notable changes to this project are documented in this file. The project fol
 - Structured framework configuration validator, editor dock, and headless validation runner
 - Deterministic addon-only ZIP packaging, SHA-256 output, clean-project install test, and release workflow
 - Performance smoke runner and bounded queued-event backlog
+- Capacity limits for threaded resource requests, downloads, HTTP history, and correlation tracking
 
 ### Changed
 
 - `GFEventBus.queue()` now returns `Error`; a full queue returns `ERR_OUT_OF_MEMORY`
 - `GFModuleDefinition` now requires declarative IDs and dependencies that must match runtime module metadata
+- Terminal HTTP and download metadata is bounded and evicts the oldest retained records
+- `GFModuleManager` is explicitly single-use after shutdown or lifecycle failure
 
 ### Known Limitations
 

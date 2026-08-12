@@ -22,7 +22,7 @@ They share one module lifecycle, but they do not pretend HTTP and WebSocket have
 
 The configured limits cover active concurrency, total in-flight request count, per-request body bytes, total waiting-body bytes, response body bytes, timeout, redirects, and threaded operation. A successful transport emits `request_completed` for every HTTP status code. The framework does not classify application statuses such as `404`, `409`, `429`, or `503`; project adapters own that policy.
 
-Use `cancel(id)` for one request or `cancel_tag(tag)` for an owned group. Terminal task metadata remains available through `task_info()` until `clear_finished()` is called. Response bytes are held in that metadata, so applications should clear finished tasks after consuming results.
+Use `cancel(id)` for one request or `cancel_tag(tag)` for an owned group. Terminal task metadata remains available through `task_info()` until `clear_finished()` is called or the bounded `http_max_finished_requests` history evicts the oldest record. Response bytes are held in that metadata, so applications should clear finished tasks after consuming results instead of relying on automatic eviction.
 
 ## WebSocket
 
@@ -46,7 +46,7 @@ Godot 4.4 implements `heartbeat_interval` with WebSocket ping control frames on 
 
 ## Correlation
 
-`GFRequestTracker` allocates monotonic IDs and owns resolve, timeout, and cancellation state. It stores optional opaque context but does not create an envelope or send anything. Applications decide how a correlation ID is encoded in JSON, MessagePack, Protobuf, or another protocol.
+`GFRequestTracker` allocates monotonic IDs and owns resolve, timeout, and cancellation state. `request_max_pending` bounds unresolved records; `begin()` returns `0` when capacity is exhausted. It stores optional opaque context but does not create an envelope or send anything. Applications decide how a correlation ID is encoded in JSON, MessagePack, Protobuf, or another protocol.
 
 A timeout of `0` means indefinite lifetime. Call `resolve(id, response)` when the application adapter receives a matching response, or `cancel(id)` when the owner ends. Shutdown cancels all remaining tracked requests.
 

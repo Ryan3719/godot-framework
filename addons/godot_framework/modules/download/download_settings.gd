@@ -5,6 +5,8 @@ extends Resource
 @export var root_name := "FrameworkDownloads"
 @export var base_directory := "user://godot_framework/downloads"
 @export_range(1, 16, 1) var max_concurrent := 2
+@export_range(1, 4096, 1) var max_in_flight_tasks := 128
+@export_range(0, 4096, 1) var max_finished_tasks := 256
 @export_range(0, 10, 1) var retry_count := 2
 @export_range(0.0, 3600.0, 0.1) var timeout_seconds := 30.0
 @export var use_threads := true
@@ -20,6 +22,10 @@ func validate() -> String:
 		return "Download base directory must be a non-root path inside user://."
 	if max_concurrent < 1 or retry_count < 0:
 		return "Download concurrency must be positive and retry count cannot be negative."
+	if max_in_flight_tasks < max_concurrent:
+		return "Download in-flight task limit cannot be below concurrency."
+	if max_finished_tasks < 0:
+		return "Download finished task limit cannot be negative."
 	if timeout_seconds < 0.0 or max_redirects < 0 or body_size_limit_bytes < -1:
 		return "Download timeout, redirect, or body-size policy is invalid."
 	for status_code: int in retry_http_status_codes:

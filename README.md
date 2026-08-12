@@ -34,7 +34,7 @@ Godot Framework provides reusable infrastructure without prescribing a game genr
 - Bounded queued-event memory with explicit overflow errors
 - Deterministic Asset Library-compatible addon packaging and clean-project installation checks
 
-Every feature except the small runtime kernel is optional through `GFFrameworkConfig`.
+Every feature except the small runtime kernel can be enabled or disabled at runtime through `GFFrameworkConfig`. The current distribution is one cohesive addon package: disabled module scripts remain present and referenced by the addon default configuration. It does not yet claim per-module package installation or deletion-safe physical stripping.
 
 ## Install
 
@@ -97,7 +97,7 @@ godot --headless --verbose --path . tests/config_validation_runner.tscn
 godot --headless --verbose --path . tests/performance_runner.tscn
 ```
 
-The test project currently runs 327 assertions plus configuration, performance-smoke, clean-package installation, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. The CI matrix uses Godot 4.4.1 and 4.7.1 and treats parse errors, engine errors, leaked objects, and resources left in use as failures.
+The test project currently runs 344 assertions plus configuration, performance-smoke, clean-package installation, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. The CI matrix uses Godot 4.4.1 and 4.7.1 and treats parse errors, engine errors, leaked objects, and resources left in use as failures.
 
 ## Documentation
 

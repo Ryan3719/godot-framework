@@ -70,7 +70,7 @@ The addon default enables the foundation modules and keeps UI, audio, input, loc
 - Input can modify only the `InputMap` actions listed in `GFInputSettings`. It captures their original bindings as restore points and leaves all other actions untouched.
 - Localization selects only configured locales, owns only translations added through its service, and restores the previous global locale when its module shuts down.
 
-Each presentation module can be removed independently. In particular, UI uses Godot `PackedScene` directly and has no artificial dependency on the resource module.
+Each presentation module can be disabled independently at runtime. In particular, UI uses Godot `PackedScene` directly and has no artificial dependency on the resource module. The distributed addon is currently one physical package, and its default configuration references every optional module script even when disabled. Deleting individual module directories therefore requires a project-owned configuration that removes those references and is not a supported package-management workflow yet.
 
 ## Content Delivery
 
@@ -104,6 +104,7 @@ This is a recoverable local persistence mechanism, not an encrypted or tamper-re
 - Every dependency is returned by `dependencies()`; hidden order dependencies are defects.
 - A module registers services during `initialize()` and removes them during `shutdown()`.
 - `shutdown()` must tolerate partial initialization and repeated framework teardown.
+- A `GFModuleManager` instance is single-use. Create a new manager and new module instances after shutdown or lifecycle failure.
 - Long-lived references from child objects to owners use weak references when both sides are `RefCounted`.
 - Cross-frame work has an explicit per-frame budget.
 - Optional modules do not become implicit global singletons.
