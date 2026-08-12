@@ -102,6 +102,17 @@ jobs:
           bash tests/verify_linux_export.sh "$package_path" "$(command -v godot)"
           cp "$package_path.sha256" "package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt"
 
+      - name: Build and run Web release export
+        run: |
+          set -euo pipefail
+          package_dir=$(mktemp -d)
+          package_path="$package_dir/godot-framework.zip"
+          python3 scripts/package_addon.py --output "$package_path"
+          python3 scripts/verify_addon_package.py "$package_path"
+          python3 tests/verify_web_export.py "$package_path" \
+            --godot "$(command -v godot)" \
+            --chromedriver "$CHROMEWEBDRIVER/chromedriver"
+
       - name: Upload addon package checksum
         uses: actions/upload-artifact@v7
         with:

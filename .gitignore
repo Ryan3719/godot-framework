@@ -10,6 +10,10 @@ dist/
 data_*/
 mono_crash.*.json
 
+# Python generated files
+__pycache__/
+*.py[cod]
+
 # Local editor and operating system files
 .DS_Store
 .idea/

@@ -26,13 +26,25 @@ func _ready() -> void:
 			"res://addons/godot_framework/editor/framework_validation_dock.gd"
 		)
 	if valid:
+		_set_web_result(true)
 		if verify_export:
 			print("[EXPORT TEST] PASS: packaged addon runs in release export")
 		else:
 			print("[PACKAGE TEST] PASS: packaged addon installs with minimal defaults")
 		framework.shutdown()
-		get_tree().quit(0)
+		if not OS.has_feature("web"):
+			get_tree().quit(0)
 		return
 	var failure_label := "EXPORT" if verify_export else "PACKAGE"
+	_set_web_result(false)
 	push_error("[%s TEST] Packaged addon runtime contract failed." % failure_label)
-	get_tree().quit(1)
+	if not OS.has_feature("web"):
+		get_tree().quit(1)
+
+
+func _set_web_result(succeeded: bool) -> void:
+	if not OS.has_feature("web") or not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge := Engine.get_singleton("JavaScriptBridge")
+	var title := "GF_EXPORT_TEST_PASS" if succeeded else "GF_EXPORT_TEST_FAIL"
+	bridge.call(&"eval", "document.title = '%s';" % title, true)
