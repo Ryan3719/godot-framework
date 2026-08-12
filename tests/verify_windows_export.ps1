@@ -13,14 +13,21 @@ $FailurePattern = "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|in
 function Invoke-Logged {
     param(
         [string]$Executable,
-        [string[]]$Arguments,
+        [string[]]$CommandArgs,
         [string]$LogPath
     )
 
-    & $Executable @Arguments *> $LogPath
-    if ($LASTEXITCODE -ne 0) {
+    $StdoutPath = "$LogPath.stdout"
+    $StderrPath = "$LogPath.stderr"
+    $Process = Start-Process -FilePath $Executable -ArgumentList $CommandArgs -Wait -PassThru -NoNewWindow `
+        -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
+    $Stdout = if (Test-Path -LiteralPath $StdoutPath) { Get-Content $StdoutPath -Raw } else { "" }
+    $Stderr = if (Test-Path -LiteralPath $StderrPath) { Get-Content $StderrPath -Raw } else { "" }
+    Set-Content -LiteralPath $LogPath -Value ($Stdout + $Stderr) -NoNewline
+    Remove-Item -LiteralPath $StdoutPath, $StderrPath -Force -ErrorAction SilentlyContinue
+    if ($Process.ExitCode -ne 0) {
         Get-Content $LogPath
-        throw "Command failed with exit code $LASTEXITCODE`: $Executable"
+        throw "Command failed with exit code $($Process.ExitCode)`: $Executable"
     }
 }
 
@@ -40,8 +47,8 @@ try {
     $ConsoleExecutable = Join-Path $ExportDir "godot-framework-test.console.exe"
 
     $ExportTarget = $Executable.Replace("\", "/")
-    Invoke-Logged -Executable $GodotBin -Arguments @("--headless", "--editor", "--quit", "--path", $ProjectDir) -LogPath $EditorLog
-    Invoke-Logged -Executable $GodotBin -Arguments @("--headless", "--path", $ProjectDir, "--export-release", "Windows", $ExportTarget) -LogPath $ExportLog
+    Invoke-Logged -Executable $GodotBin -CommandArgs @("--headless", "--editor", "--quit", "--path", $ProjectDir) -LogPath $EditorLog
+    Invoke-Logged -Executable $GodotBin -CommandArgs @("--headless", "--path", $ProjectDir, "--export-release", "Windows", $ExportTarget) -LogPath $ExportLog
     if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
         Get-Content $ExportLog
         Get-ChildItem -LiteralPath $ProjectDir, $ExportDir -Recurse | Select-Object -ExpandProperty FullName
@@ -52,7 +59,7 @@ try {
     }
     Push-Location $ExportDir
     try {
-        Invoke-Logged -Executable $ConsoleExecutable -Arguments @("--headless", "--verbose") -LogPath $RunLog
+        Invoke-Logged -Executable $ConsoleExecutable -CommandArgs @("--headless", "--verbose") -LogPath $RunLog
     } finally {
         Pop-Location
     }
