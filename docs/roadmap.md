@@ -16,10 +16,13 @@ Exit criteria: Godot 4.4 compatibility, deterministic tests, zero lifecycle leak
 
 ## 0.2 Presentation And Media
 
-- Optional UI navigation service with layers, history, modal policy, and project-owned views
-- Audio buses, groups, playback handles, concurrency limits, and fades
-- Input remapping profiles and device-change signals
-- Localization facade over Godot TranslationServer with content validation
+Status: implemented in the current development branch. These modules are present in the default configuration but disabled by default.
+
+- Optional UI navigation service with layers, stack navigation, singleton routes, input-blocking layers, and project-owned views
+- Logical audio groups, buses, playback handles, pause/stop controls, tags, and concurrency policies
+- Input remapping and serializable profiles for an explicit managed-action allowlist
+- Localization facade over Godot `TranslationServer` with locale fallback, owned translations, formatting, and content validation
+- Module lifecycle integration tests and headless audio injection boundary
 
 Exit criteria: modules can be removed independently and do not ship branded screens or concrete game flow.
 

@@ -13,7 +13,8 @@ Application / game
   Scenes, UI, domain state, gameplay systems, project adapters
                          |
 Optional framework modules
-  Resource, scene, storage, settings, pool, state machine
+  Resource, scene, storage, settings, pool, state machine,
+  UI, audio, input, localization
                          |
 Stable framework kernel
   Host, module lifecycle, services, events, messages, logging
@@ -57,6 +58,15 @@ Framework and module configuration uses typed Godot `Resource` objects. The addo
 
 Resources hold authorable configuration. Runtime save data is restricted to object-free Variants and never serializes `Node`, `Resource`, texture, audio, or arbitrary script objects.
 
+The addon default enables the foundation modules and keeps UI, audio, input, and localization disabled. Enabling those modules is an explicit project decision:
+
+- UI owns a node root and configured `CanvasLayer` instances. Routes point to project-owned scenes whose roots extend `GFUIView`; the framework owns navigation lifecycle, not screen content.
+- Audio owns its players beneath one node root. Project configuration defines logical groups and buses, while playback handles and group volume are runtime state.
+- Input can modify only the `InputMap` actions listed in `GFInputSettings`. It captures their original bindings as restore points and leaves all other actions untouched.
+- Localization selects only configured locales, owns only translations added through its service, and restores the previous global locale when its module shuts down.
+
+Each presentation module can be removed independently. In particular, UI uses Godot `PackedScene` directly and has no artificial dependency on the resource module.
+
 ## Storage Safety
 
 Storage writes an object-free Variant envelope to a temporary file, rotates backups, then replaces the primary file. Deserialization explicitly disables object construction. Schema upgrades run one registered migration per version and reject future schemas.
@@ -73,3 +83,7 @@ This is a recoverable local persistence mechanism, not an encrypted or tamper-re
 - Cross-frame work has an explicit per-frame budget.
 - Optional modules do not become implicit global singletons.
 - Domain constants and game content never enter the framework addon.
+
+## Headless Boundaries
+
+`GFAudioService` normally calls `AudioStreamPlayer.play()` and `stop()`. Its constructor also accepts playback callables so deterministic headless tests can exercise ownership and concurrency without creating a live `AudioServer` playback. This is a test boundary, not a second production audio backend.

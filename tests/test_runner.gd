@@ -12,8 +12,13 @@ func _ready() -> void:
 	_test_message_bus()
 	_test_module_dependencies_and_lifecycle()
 	_test_module_failure_rollback()
+	_test_optional_module_lifecycle()
 	_test_state_machine()
 	_test_object_pool()
+	_test_ui_service()
+	await _test_audio_service()
+	_test_input_service()
+	_test_localization_service()
 	await _test_resource_service()
 	_test_settings_service()
 	_test_storage_service_and_migration()
@@ -36,6 +41,13 @@ func _test_default_framework_boot() -> void:
 	_expect(
 		framework.get_service(GFServiceIds.STATE_MACHINES) is GFStateMachineService,
 		"State machine module is registered",
+	)
+	_expect(framework.get_service(GFServiceIds.UI) == null, "Optional UI module is disabled by default")
+	_expect(framework.get_service(GFServiceIds.AUDIO) == null, "Optional audio module is disabled by default")
+	_expect(framework.get_service(GFServiceIds.INPUT) == null, "Optional input module is disabled by default")
+	_expect(
+		framework.get_service(GFServiceIds.LOCALIZATION) == null,
+		"Optional localization module is disabled by default",
 	)
 	var ordered := framework.modules.ordered_ids()
 	_expect(ordered.find(&"resource") < ordered.find(&"scene"), "Resource dependency starts before scene")
@@ -159,6 +171,69 @@ func _test_module_failure_rollback() -> void:
 	)
 
 
+func _test_optional_module_lifecycle() -> void:
+	var services := GFServiceContainer.new()
+	var manager := _new_module_manager(services)
+	var resource_module := GFResourceModule.new()
+	var ui_module := GFUIModule.new()
+	var ui_settings := GFUISettings.new()
+	ui_settings.root_name = "IntegratedTestUI"
+	ui_module.configure(ui_settings)
+	var audio_module := GFAudioModule.new()
+	var audio_settings := GFAudioSettings.new()
+	audio_settings.root_name = "IntegratedTestAudio"
+	audio_module.configure(audio_settings)
+	var input_module := GFInputModule.new()
+	input_module.configure(GFInputSettings.new())
+	var localization_module := GFLocalizationModule.new()
+	var localization_settings := GFLocalizationSettings.new()
+	localization_settings.supported_locales = PackedStringArray(["en"])
+	localization_settings.fallback_locale = "en"
+	localization_settings.use_system_locale = false
+	localization_module.configure(localization_settings)
+
+	_expect(manager.install(ui_module) == OK, "Optional UI module can be installed before its dependency")
+	_expect(manager.install(audio_module) == OK, "Optional audio module can be installed")
+	_expect(manager.install(input_module) == OK, "Optional input module can be installed")
+	_expect(manager.install(localization_module) == OK, "Optional localization module can be installed")
+	_expect(manager.install(resource_module) == OK, "Resource module can coexist with optional modules")
+	_expect(manager.initialize_all() == OK and manager.start_all() == OK, "Optional modules start through module manager")
+	_expect(
+		ui_module.dependencies().is_empty(),
+		"UI module does not require an unused resource dependency",
+	)
+	_expect(services.resolve(GFServiceIds.UI) is GFUIService, "UI module registers its service")
+	_expect(services.resolve(GFServiceIds.AUDIO) is GFAudioService, "Audio module registers its service")
+	_expect(services.resolve(GFServiceIds.INPUT) is GFInputService, "Input module registers its service")
+	_expect(
+		services.resolve(GFServiceIds.LOCALIZATION) is GFLocalizationService,
+		"Localization module registers its service",
+	)
+	manager.shutdown_all()
+	_expect(not services.has(GFServiceIds.UI), "UI module removes its service during shutdown")
+	_expect(not services.has(GFServiceIds.AUDIO), "Audio module removes its service during shutdown")
+	_expect(not services.has(GFServiceIds.INPUT), "Input module removes its service during shutdown")
+	_expect(
+		not services.has(GFServiceIds.LOCALIZATION),
+		"Localization module removes its service during shutdown",
+	)
+
+	var existing_input_service := RefCounted.new()
+	var failure_services := GFServiceContainer.new()
+	failure_services.register(GFServiceIds.INPUT, existing_input_service)
+	var failure_manager := _new_module_manager(failure_services)
+	var invalid_input_module := GFInputModule.new()
+	var invalid_input_settings := GFInputSettings.new()
+	invalid_input_settings.managed_actions = [&"gf_missing_action"]
+	invalid_input_module.configure(invalid_input_settings)
+	failure_manager.install(invalid_input_module)
+	_expect(failure_manager.initialize_all() == ERR_DOES_NOT_EXIST, "Invalid input configuration fails startup")
+	_expect(
+		is_same(failure_services.resolve(GFServiceIds.INPUT), existing_input_service),
+		"Input rollback preserves a service it does not own",
+	)
+
+
 func _test_state_machine() -> void:
 	var trace: Array[String] = []
 	var machine := GFStateMachine.new()
@@ -200,6 +275,195 @@ func _test_object_pool() -> void:
 	var duplicate_pool := GFObjectPool.new(func() -> RefCounted: return shared, 2)
 	_expect(duplicate_pool.warm_up(2) == 1, "Pool rejects duplicate object identity during warm-up")
 	duplicate_pool.clear()
+
+
+func _test_ui_service() -> void:
+	var ui := GFUIService.new(self, "TestUI")
+	var layer := GFUILayerDefinition.new()
+	layer.layer_id = &"screen"
+	layer.canvas_layer = 10
+	_expect(ui.register_layer(layer) == OK, "UI layer can be registered")
+	_expect(ui.register_layer(layer) == ERR_ALREADY_EXISTS, "Duplicate UI layer is rejected")
+
+	var route_a := GFUIRoute.new()
+	route_a.route_id = &"screen.a"
+	route_a.layer_id = layer.layer_id
+	route_a.scene = load("res://tests/fixtures/tracking_view.tscn")
+	var route_b := GFUIRoute.new()
+	route_b.route_id = &"screen.b"
+	route_b.layer_id = layer.layer_id
+	route_b.scene = route_a.scene
+	route_b.singleton = true
+	var invalid_root := Node.new()
+	var invalid_scene := PackedScene.new()
+	var invalid_scene_result := invalid_scene.pack(invalid_root)
+	invalid_root.free()
+	var invalid_route := GFUIRoute.new()
+	invalid_route.route_id = &"screen.invalid"
+	invalid_route.layer_id = layer.layer_id
+	invalid_route.scene = invalid_scene
+	_expect(
+		ui.register_route(route_a) == OK and ui.register_route(route_b) == OK,
+		"UI routes can be registered",
+	)
+	_expect(
+		invalid_scene_result == OK and ui.register_route(invalid_route) == OK,
+		"UI route validation accepts any PackedScene before instantiation",
+	)
+	_expect(ui.unregister_layer(layer.layer_id) == ERR_ALREADY_IN_USE, "UI layer with routes cannot be removed")
+
+	var first := ui.open(route_a.route_id, {"index": 1}) as GFTrackingTestView
+	_expect(first != null and first.lifecycle == GFUIView.Lifecycle.OPENED, "UI push opens a configured view")
+	var second := ui.open(route_b.route_id, {"index": 2}) as GFTrackingTestView
+	_expect(first.lifecycle == GFUIView.Lifecycle.SUSPENDED, "UI push suspends previous layer top")
+	_expect(second.lifecycle == GFUIView.Lifecycle.OPENED and ui.top(layer.layer_id) == second, "UI top tracks latest view")
+	_expect(ui.open(route_b.route_id) == second, "Singleton UI route reuses open instance")
+	_expect(ui.stack_size(layer.layer_id) == 2, "Singleton reuse does not grow UI stack")
+	var third := ui.open(route_a.route_id, {"index": 3}) as GFTrackingTestView
+	_expect(ui.open(route_b.route_id, "focused") == second, "Singleton UI route can be focused again")
+	_expect(
+		second.lifecycle == GFUIView.Lifecycle.OPENED and ui.top(layer.layer_id) == second,
+		"Reopened singleton view returns to the top",
+	)
+	_expect(third.lifecycle == GFUIView.Lifecycle.SUSPENDED, "Focusing singleton suspends previous top")
+	_expect(ui.close(first, "background") == OK, "UI can close a non-top view")
+	_expect(second.lifecycle == GFUIView.Lifecycle.OPENED, "Closing non-top view does not resume another view")
+	second.request_close("accepted")
+	_expect(ui.stack_size(layer.layer_id) == 1, "View close request removes top from stack")
+	_expect(second.trace.back() == ["closed", "accepted"], "View close result reaches lifecycle callback")
+	_expect(third.lifecycle == GFUIView.Lifecycle.OPENED, "Closing focused singleton resumes previous view")
+	ui.pop(layer.layer_id)
+
+	var replacement_source := ui.open(route_a.route_id, 1) as GFTrackingTestView
+	var replacement := ui.open(route_b.route_id, 2, GFUIService.OpenMode.REPLACE_TOP) as GFTrackingTestView
+	_expect(replacement_source.lifecycle == GFUIView.Lifecycle.CLOSED, "Replace mode closes previous top")
+	_expect(replacement != null and ui.stack_size(layer.layer_id) == 1, "Replace mode leaves one new top")
+	_expect(ui.pop(layer.layer_id, 3) == OK and replacement.trace.back() == ["closed", 3], "UI pop closes layer top")
+	var stable := ui.open(route_a.route_id) as GFTrackingTestView
+	_expect(
+		ui.open(invalid_route.route_id, null, GFUIService.OpenMode.REPLACE_TOP) == null
+		and ui.top(layer.layer_id) == stable
+		and stable.lifecycle == GFUIView.Lifecycle.OPENED,
+		"Invalid replacement scene preserves the current UI view",
+	)
+	ui.pop(layer.layer_id)
+	_expect(ui.open(&"missing") == null and ui.last_error.contains("Unknown"), "Unknown UI route fails explicitly")
+	ui.shutdown()
+
+
+func _test_audio_service() -> void:
+	var starts: Array[float] = []
+	var stops := [0]
+	var audio := GFAudioService.new(
+		self,
+		"TestAudio",
+		Callable(),
+		func(_player: AudioStreamPlayer, position: float) -> void: starts.append(position),
+		func(_player: AudioStreamPlayer) -> void: stops[0] += 1,
+	)
+	var group := GFAudioGroupDefinition.new()
+	group.group_id = &"sfx"
+	group.max_voices = 1
+	group.volume_db = -3.0
+	group.overflow_policy = GFAudioGroupDefinition.OverflowPolicy.REJECT_NEW
+	_expect(audio.register_group(group) == OK, "Audio group can be registered")
+	_expect(audio.register_group(group) == ERR_ALREADY_EXISTS, "Duplicate audio group is rejected")
+
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_8_BITS
+	stream.mix_rate = 8000
+	stream.data = PackedByteArray([128, 128, 128, 128])
+	var first_handle := audio.play(stream, group.group_id, &"click", -2.0, 1.25)
+	var first_player := audio.get_player(first_handle)
+	_expect(first_handle > 0 and first_player != null, "Audio playback returns a live handle")
+	_expect(starts == [0.0], "Audio service starts its player")
+	_expect(first_player.bus == &"Master", "Audio playback uses configured bus")
+	_expect(is_equal_approx(first_player.volume_db, -5.0), "Audio playback combines group and request volume")
+	_expect(is_equal_approx(first_player.pitch_scale, 1.25), "Audio playback applies pitch")
+	_expect(audio.play(stream, group.group_id, &"rejected") == 0, "Reject policy enforces audio voice limit")
+	_expect(audio.set_group_paused(group.group_id, true) == OK, "Audio group pause state can change")
+	_expect(audio.set_group_volume_db(group.group_id, -6.0) == OK, "Audio group volume can change")
+	_expect(is_equal_approx(first_player.volume_db, -8.0), "Audio group volume preserves request offset")
+	_expect(is_equal_approx(group.volume_db, -3.0), "Runtime audio volume does not mutate authored settings")
+	_expect(audio.stop(first_handle), "Audio playback can be stopped by handle")
+	_expect(not audio.is_active(first_handle) and audio.active_count(group.group_id) == 0, "Stopped audio releases its handle")
+	_expect(stops[0] == 1, "Audio service invokes the configured playback stopper")
+
+	group.overflow_policy = GFAudioGroupDefinition.OverflowPolicy.STOP_OLDEST
+	var old_handle := audio.play(stream, group.group_id, &"old")
+	var new_handle := audio.play(stream, group.group_id, &"new")
+	_expect(old_handle > 0 and new_handle > old_handle, "Overflow policy starts replacement playback")
+	_expect(not audio.is_active(old_handle) and audio.is_active(new_handle), "Stop-oldest policy releases previous voice")
+	_expect(audio.stop_group(group.group_id, &"new") == 1, "Audio group can stop playbacks by tag")
+	_expect(audio.unregister_group(group.group_id) == OK, "Inactive audio group can be removed")
+	_expect(audio.play(stream, &"missing") == 0, "Unknown audio group is rejected")
+	audio.shutdown()
+	await get_tree().process_frame
+
+
+func _test_input_service() -> void:
+	var action_a := &"gf_test_action_a"
+	var action_b := &"gf_test_action_b"
+	InputMap.add_action(action_a)
+	InputMap.add_action(action_b)
+	var default_key := InputEventKey.new()
+	default_key.physical_keycode = KEY_A
+	InputMap.action_add_event(action_a, default_key)
+	var input_service := GFInputService.new([action_a, action_b])
+	_expect(input_service.has_action(action_a), "Input service manages configured actions")
+	_expect(input_service.events_for(action_a).size() == 1, "Input service captures action events")
+
+	var key_b := InputEventKey.new()
+	key_b.physical_keycode = KEY_B
+	_expect(input_service.add_binding(action_b, key_b) == OK, "Input binding can be added")
+	_expect(input_service.add_binding(action_b, key_b) == ERR_ALREADY_EXISTS, "Equivalent input binding is rejected")
+	_expect(input_service.find_conflicts(key_b) == [action_b], "Input conflicts are reported across managed actions")
+	_expect(input_service.find_conflicts(key_b, action_b).is_empty(), "Input conflict query can exclude an action")
+
+	var profile := input_service.capture_profile()
+	_expect(profile.actions.has(str(action_a)) and profile.actions.has(str(action_b)), "Input profile captures managed actions")
+	var mouse := InputEventMouseButton.new()
+	mouse.button_index = MOUSE_BUTTON_LEFT
+	_expect(input_service.rebind(action_a, [mouse]) == OK, "Input action can be rebound")
+	_expect(input_service.has_equivalent_binding(action_a, mouse), "Rebound input event is active")
+	_expect(input_service.apply_profile(profile) == OK, "Input profile can be reapplied")
+	_expect(input_service.has_equivalent_binding(action_a, default_key), "Input profile restores encoded key event")
+	_expect(input_service.restore_defaults(action_a) == OK, "Input action restores captured default")
+	_expect(input_service.remove_binding(action_b, key_b) == OK, "Input binding can be removed")
+	_expect(input_service.remove_binding(action_b, key_b) == ERR_DOES_NOT_EXIST, "Missing input binding reports error")
+	_expect(input_service.apply_profile({"version": 99, "actions": {}}) == ERR_INVALID_DATA, "Unsupported input profile is rejected")
+	InputMap.erase_action(action_a)
+	InputMap.erase_action(action_b)
+
+
+func _test_localization_service() -> void:
+	var previous_locale := TranslationServer.get_locale()
+	var localization := GFLocalizationService.new(PackedStringArray(["en_US", "zh_CN"]), "en_US")
+	_expect(localization.supported_locales() == PackedStringArray(["en_US", "zh_CN"]), "Locales are standardized and deduplicated")
+	_expect(localization.choose_best_locale("zh_TW") == "zh_CN", "Locale selection falls back by language")
+	_expect(localization.choose_best_locale("fr_FR") == "en_US", "Locale selection falls back to configured locale")
+	_expect(localization.set_locale("fr_FR") == ERR_DOES_NOT_EXIST, "Unsupported locale is rejected")
+
+	var english := Translation.new()
+	english.locale = "en_US"
+	english.add_message(&"framework.test.hello", "Hello {name}")
+	var chinese := Translation.new()
+	chinese.locale = "zh_CN"
+	chinese.add_message(&"framework.test.hello", "Ni Hao {name}")
+	_expect(localization.add_translation(english) == OK, "Translation can be registered")
+	_expect(localization.add_translation(english) == ERR_ALREADY_EXISTS, "Duplicate translation resource is rejected")
+	_expect(localization.add_translation(chinese) == OK, "Second locale translation can be registered")
+	_expect(localization.set_locale("zh_CN") == OK, "Supported locale can be selected")
+	_expect(localization.translate(&"framework.test.hello") == "Ni Hao {name}", "Translation resolves current locale")
+	_expect(localization.format(&"framework.test.hello", {"name": "Codex"}) == "Ni Hao Codex", "Localized string can be formatted")
+	_expect(localization.has_message(&"framework.test.hello", "en_US"), "Translation key existence can be checked")
+	var missing := localization.validate_messages([&"framework.test.hello", &"framework.test.missing"])
+	_expect(missing["en_US"] == [&"framework.test.missing"], "Translation validation reports missing English key")
+	_expect(missing["zh_CN"] == [&"framework.test.missing"], "Translation validation reports missing Chinese key")
+	_expect(localization.remove_translation(chinese), "Owned translation can be removed")
+	_expect(not localization.remove_translation(chinese), "Removed translation is no longer owned")
+	localization.shutdown()
+	TranslationServer.set_locale(previous_locale)
 
 
 func _test_resource_service() -> void:
@@ -296,8 +560,8 @@ func _test_storage_service_and_migration() -> void:
 	DirAccess.remove_absolute(version_one.base_directory)
 
 
-func _new_module_manager() -> GFModuleManager:
-	var services := GFServiceContainer.new()
+func _new_module_manager(service_container: GFServiceContainer = null) -> GFModuleManager:
+	var services := service_container if service_container != null else GFServiceContainer.new()
 	var events := GFEventBus.new()
 	var messages := GFMessageBus.new()
 	var logger := GFLogger.new()

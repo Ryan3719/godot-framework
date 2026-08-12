@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://addons/godot_framework/core/framework_config.gd" id="1_config"]
 [ext_resource type="Script" path="res://addons/godot_framework/core/module_definition.gd" id="2_definition"]
@@ -11,6 +11,14 @@
 [ext_resource type="Resource" path="res://addons/godot_framework/config/default_settings_settings.tres" id="9_settings_settings"]
 [ext_resource type="Script" path="res://addons/godot_framework/modules/pool/pool_module.gd" id="10_pool_module"]
 [ext_resource type="Script" path="res://addons/godot_framework/modules/state_machine/state_machine_module.gd" id="11_fsm_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_module.gd" id="12_ui_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_ui_settings.tres" id="13_ui_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/audio/audio_module.gd" id="14_audio_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_audio_settings.tres" id="15_audio_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/input/input_module.gd" id="16_input_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_input_settings.tres" id="17_input_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/localization/localization_module.gd" id="18_localization_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_localization_settings.tres" id="19_localization_settings"]
 
 [sub_resource type="Resource" id="ModuleDefinition_resource"]
 script = ExtResource("2_definition")
@@ -39,6 +47,30 @@ module_script = ExtResource("10_pool_module")
 script = ExtResource("2_definition")
 module_script = ExtResource("11_fsm_module")
 
+[sub_resource type="Resource" id="ModuleDefinition_ui"]
+script = ExtResource("2_definition")
+enabled = false
+module_script = ExtResource("12_ui_module")
+settings = ExtResource("13_ui_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_audio"]
+script = ExtResource("2_definition")
+enabled = false
+module_script = ExtResource("14_audio_module")
+settings = ExtResource("15_audio_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_input"]
+script = ExtResource("2_definition")
+enabled = false
+module_script = ExtResource("16_input_module")
+settings = ExtResource("17_input_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_localization"]
+script = ExtResource("2_definition")
+enabled = false
+module_script = ExtResource("18_localization_module")
+settings = ExtResource("19_localization_settings")
+
 [resource]
 script = ExtResource("1_config")
-modules = Array[ExtResource("2_definition")]([SubResource("ModuleDefinition_resource"), SubResource("ModuleDefinition_scene"), SubResource("ModuleDefinition_storage"), SubResource("ModuleDefinition_settings"), SubResource("ModuleDefinition_pool"), SubResource("ModuleDefinition_fsm")])
+modules = Array[ExtResource("2_definition")]([SubResource("ModuleDefinition_resource"), SubResource("ModuleDefinition_scene"), SubResource("ModuleDefinition_storage"), SubResource("ModuleDefinition_settings"), SubResource("ModuleDefinition_pool"), SubResource("ModuleDefinition_fsm"), SubResource("ModuleDefinition_ui"), SubResource("ModuleDefinition_audio"), SubResource("ModuleDefinition_input"), SubResource("ModuleDefinition_localization")])

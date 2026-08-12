@@ -48,6 +48,10 @@ extends Resource
 
 Create a `GFModuleDefinition`, assign the module script and settings resource, and append it to the project's `GFFrameworkConfig`.
 
+The default configuration already contains disabled definitions for UI, audio, input, and localization. Duplicate the framework and relevant settings resources outside `addons/`, then enable the definitions in the project copy. Do not edit addon defaults because an upgrade can replace them.
+
+For UI, keep layers and route metadata in `GFUISettings`, and keep concrete scenes and application behavior in the project. For input, list only actions the framework may rebind. For localization, configure the supported locale allowlist and fallback explicitly. Audio groups must reference buses that exist in the project.
+
 ## Service Ownership
 
 A module owns every service it registers. Use identity-checked unregister when several implementations may share an ID:
@@ -78,3 +82,5 @@ godot --headless --verbose --path .
 ```
 
 Treat leak warnings as failures even when Godot exits with code zero.
+
+Audio tests should inject playback start and stop callables into `GFAudioService`. Native `AudioStreamPlayer.play()` and `stop()` are not virtual GDScript methods, and live dummy-server playback can retain engine playback references at headless shutdown. Production construction leaves the callables empty and uses the native methods.
