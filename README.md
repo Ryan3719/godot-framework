@@ -97,9 +97,9 @@ godot --headless --verbose --path . tests/config_validation_runner.tscn
 godot --headless --verbose --path . tests/performance_runner.tscn
 ```
 
-The test project currently runs 366 assertions plus configuration, performance-smoke, clean-package installation, Linux, macOS, and Windows release-export execution, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. CI uses matching export templates for Godot 4.4.1 and 4.7.1, compares addon package hashes across all three desktop runner operating systems, and treats parse errors, engine errors, leaked objects, and resources left in use as failures.
+The test project currently runs 366 assertions plus configuration, performance-smoke, clean-package installation, Linux, macOS, Windows, and browser-executed Web release exports, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. CI uses matching export templates for Godot 4.4.1 and 4.7.1, compares addon package hashes across all three desktop runner operating systems, and treats parse errors, engine errors, browser errors, leaked objects, and resources left in use as failures.
 
-Export execution validates the clean addon's six-module default runtime boundary. It does not claim exported integration coverage for every disabled optional module, Web or mobile platforms, production code signing, notarization, or store submission.
+Export execution validates the clean addon's six-module default runtime boundary, including a single-threaded Web build in headless Chrome. It does not claim exported integration coverage for every disabled optional module, threaded Web builds, mobile platforms, production code signing, notarization, or store submission.
 
 ## Documentation
 
