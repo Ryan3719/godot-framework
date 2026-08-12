@@ -128,3 +128,34 @@ jobs:
           python3 scripts/package_addon.py --output "$package_path"
           python3 scripts/verify_addon_package.py "$package_path"
           bash tests/verify_macos_export.sh "$package_path" "$(command -v godot)"
+
+  windows-export:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        godot-version: [4.4.1, 4.7.1]
+    name: Windows export (${{ matrix.godot-version }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2.4.1
+        with:
+          version: ${{ matrix.godot-version }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Build and run Windows release export
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path $env:RUNNER_TEMP ([guid]::NewGuid())
+          New-Item -ItemType Directory -Path $packageDir | Out-Null
+          $packagePath = Join-Path $packageDir "godot-framework.zip"
+          python scripts/package_addon.py --output $packagePath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/verify_addon_package.py $packagePath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/verify_windows_export.ps1 -PackagePath $packagePath -GodotBin (Get-Command godot).Source

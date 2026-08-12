@@ -15,7 +15,7 @@ All notable changes to this project are documented in this file. The project fol
 - Deterministic addon-only ZIP packaging, SHA-256 output, clean-project install test, and release workflow
 - Performance smoke runner and bounded queued-event backlog
 - Capacity limits for threaded resource requests, downloads, HTTP history, and correlation tracking
-- Linux and macOS release-export execution tests using the packaged addon and matching Godot templates
+- Linux, macOS, and Windows release-export execution tests using the packaged addon and matching Godot templates
 - Size-bounded, checksummed storage envelopes with backup fallback for missing or corrupt primaries
 
 ### Changed
