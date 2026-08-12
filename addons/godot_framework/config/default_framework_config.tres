@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/core/framework_config.gd" id="1_config"]
+[ext_resource type="Script" path="res://addons/godot_framework/core/module_definition.gd" id="2_definition"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/resource/resource_module.gd" id="3_resource_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_resource_settings.tres" id="4_resource_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/scene/scene_module.gd" id="5_scene_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/storage/storage_module.gd" id="6_storage_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_storage_settings.tres" id="7_storage_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/settings/settings_module.gd" id="8_settings_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_settings_settings.tres" id="9_settings_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/pool/pool_module.gd" id="10_pool_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/state_machine/state_machine_module.gd" id="11_fsm_module"]
+
+[sub_resource type="Resource" id="ModuleDefinition_resource"]
+script = ExtResource("2_definition")
+module_script = ExtResource("3_resource_module")
+settings = ExtResource("4_resource_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_scene"]
+script = ExtResource("2_definition")
+module_script = ExtResource("5_scene_module")
+
+[sub_resource type="Resource" id="ModuleDefinition_storage"]
+script = ExtResource("2_definition")
+module_script = ExtResource("6_storage_module")
+settings = ExtResource("7_storage_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_settings"]
+script = ExtResource("2_definition")
+module_script = ExtResource("8_settings_module")
+settings = ExtResource("9_settings_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_pool"]
+script = ExtResource("2_definition")
+module_script = ExtResource("10_pool_module")
+
+[sub_resource type="Resource" id="ModuleDefinition_fsm"]
+script = ExtResource("2_definition")
+module_script = ExtResource("11_fsm_module")
+
+[resource]
+script = ExtResource("1_config")
+modules = Array[ExtResource("2_definition")]([SubResource("ModuleDefinition_resource"), SubResource("ModuleDefinition_scene"), SubResource("ModuleDefinition_storage"), SubResource("ModuleDefinition_settings"), SubResource("ModuleDefinition_pool"), SubResource("ModuleDefinition_fsm")])

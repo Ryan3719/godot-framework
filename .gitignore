@@ -15,4 +15,3 @@ mono_crash.*.json
 .idea/
 .vscode/
 *.translation
-export_presets.cfg
