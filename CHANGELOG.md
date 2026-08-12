@@ -15,8 +15,12 @@ All notable changes to this project are documented in this file. The project fol
 - Deterministic addon-only ZIP packaging, SHA-256 output, clean-project install test, and release workflow
 - Performance smoke runner and bounded queued-event backlog
 - Capacity limits for threaded resource requests, downloads, HTTP history, and correlation tracking
+- Linux release-export execution tests using the packaged addon and matching Godot templates
+- Size-bounded, checksummed storage envelopes with backup fallback for missing or corrupt primaries
 
 ### Changed
+
+- Framework initialization, startup, frame forwarding, and teardown tolerate modules shutting down the host reentrantly
 
 - `GFEventBus.queue()` now returns `Error`; a full queue returns `ERR_OUT_OF_MEMORY`
 - `GFModuleDefinition` now requires declarative IDs and dependencies that must match runtime module metadata

@@ -51,10 +51,13 @@ func initialize_all() -> Error:
 		var module: GFModule = _modules[id]
 		var result := module._framework_initialize(_context)
 		if result != OK:
+			var shutdown_was_requested := _terminated
+			_terminated = true
 			module._framework_shutdown()
 			for index in range(initialized.size() - 1, -1, -1):
 				initialized[index]._framework_shutdown()
-			_terminated = true
+			if shutdown_was_requested:
+				return _fail(ERR_BUSY, "Module '%s' interrupted framework initialization by shutting down the manager." % id)
 			return _fail(result, "Module '%s' failed to initialize with error %d." % [id, result])
 		initialized.append(module)
 	_initialized = true
@@ -73,7 +76,10 @@ func start_all() -> Error:
 		var module: GFModule = _modules[id]
 		var result := module._framework_start()
 		if result != OK:
+			var shutdown_was_requested := _terminated
 			shutdown_all()
+			if shutdown_was_requested:
+				return _fail(ERR_BUSY, "Module '%s' interrupted framework startup by shutting down the manager." % id)
 			return _fail(result, "Module '%s' failed to start with error %d." % [id, result])
 		started.append(module)
 	_running = true
@@ -101,12 +107,12 @@ func physics_update(delta: float) -> void:
 func shutdown_all() -> void:
 	if _terminated:
 		return
+	_terminated = true
 	for index in range(_resolved_order.size() - 1, -1, -1):
 		var module: GFModule = _modules[_resolved_order[index]]
 		module._framework_shutdown()
 	_running = false
 	_initialized = false
-	_terminated = true
 
 
 func get_module(module_id: StringName) -> GFModule:

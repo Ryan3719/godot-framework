@@ -6,6 +6,7 @@ extends Resource
 @export var file_extension := "save"
 @export_range(0, 100, 1) var backup_count := 1
 @export_range(1, 2147483647, 1) var schema_version := 1
+@export_range(1024, 268435456, 1024) var max_file_bytes := 16777216
 
 
 func validate() -> String:
@@ -17,6 +18,8 @@ func validate() -> String:
 		return "Storage backup count cannot be negative."
 	if schema_version < 1:
 		return "Storage schema version must be at least one."
+	if max_file_bytes < 1024:
+		return "Storage file size limit must be at least 1024 bytes."
 	return ""
 
 

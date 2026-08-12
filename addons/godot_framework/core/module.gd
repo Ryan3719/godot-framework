@@ -57,6 +57,8 @@ func _framework_initialize(module_context: GFContext) -> Error:
 	context = module_context
 	lifecycle = Lifecycle.INITIALIZING
 	var result := initialize()
+	if lifecycle != Lifecycle.INITIALIZING:
+		return ERR_BUSY
 	lifecycle = Lifecycle.INITIALIZED if result == OK else Lifecycle.FAILED
 	return result
 
@@ -65,6 +67,8 @@ func _framework_start() -> Error:
 	if lifecycle != Lifecycle.INITIALIZED:
 		return ERR_UNCONFIGURED
 	var result := start()
+	if lifecycle != Lifecycle.INITIALIZED:
+		return ERR_BUSY
 	lifecycle = Lifecycle.STARTED if result == OK else Lifecycle.FAILED
 	return result
 

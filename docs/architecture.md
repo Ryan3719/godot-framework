@@ -94,7 +94,7 @@ Godot 4.4 `WebSocketPeer` supplies native ping control frames through `heartbeat
 
 ## Storage Safety
 
-Storage writes an object-free Variant envelope to a temporary file, rotates backups, then replaces the primary file. Deserialization explicitly disables object construction. Schema upgrades run one registered migration per version and reject future schemas.
+Storage writes a size-bounded, checksummed, object-free Variant envelope to a temporary file, rotates backups, then replaces the primary file. Loading enforces the configured byte limit and validates the file framing and SHA-256 before decoding, tries the primary file followed by configured backups, and reports the backup path when recovery succeeds; it does not overwrite recovery files implicitly. Deserialization explicitly disables object construction. Schema upgrades run one registered migration per version and reject future schemas.
 
 This is a recoverable local persistence mechanism, not an encrypted or tamper-resistant format. Competitive or authoritative state belongs on a trusted server. Platform APIs differ in filesystem guarantees, so the framework does not claim strict cross-platform atomicity.
 

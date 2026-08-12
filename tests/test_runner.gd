@@ -7,6 +7,7 @@ var _failures: Array[String] = []
 func _ready() -> void:
 	await get_tree().process_frame
 	_test_default_framework_boot()
+	_test_framework_host_reentrant_shutdown()
 	_test_service_container()
 	_test_event_bus()
 	_test_message_bus()
@@ -64,6 +65,65 @@ func _test_default_framework_boot() -> void:
 	)
 	var ordered := framework.modules.ordered_ids()
 	_expect(ordered.find(&"resource") < ordered.find(&"scene"), "Resource dependency starts before scene")
+
+
+func _test_framework_host_reentrant_shutdown() -> void:
+	var definition := GFModuleDefinition.new()
+	definition.declared_id = &"shutdown_host"
+	definition.module_script = GFShutdownHostTestModule
+	var reentrant_config := GFFrameworkConfig.new()
+	reentrant_config.modules = [definition]
+	var framework := GFFrameworkHost.new()
+	var shutdown_count := [0]
+	framework.shutdown_completed.connect(func() -> void: shutdown_count[0] += 1)
+	_expect(framework.boot(reentrant_config) == OK, "Standalone framework host boots for reentrant shutdown")
+	framework._process(0.0)
+	_expect(not framework.is_booted(), "Module update can shut down the framework host reentrantly")
+	_expect(
+		framework.modules == null and framework.events == null and framework.config == null,
+		"Reentrant host shutdown releases lifecycle state before the frame returns",
+	)
+	_expect(shutdown_count[0] == 1, "Reentrant shutdown emits completion exactly once")
+	framework._process(0.0)
+	framework._physics_process(0.0)
+	_expect(framework.boot(reentrant_config) == OK, "Framework host can boot fresh modules after shutdown")
+	framework.shutdown()
+	_expect(shutdown_count[0] == 2, "Repeated framework lifetimes complete independently")
+	framework.free()
+
+	var initialize_definition := GFModuleDefinition.new()
+	initialize_definition.declared_id = &"initialize_shutdown_host"
+	initialize_definition.module_script = GFInitializeShutdownHostTestModule
+	var initialize_config := GFFrameworkConfig.new()
+	initialize_config.modules = [initialize_definition]
+	initialize_config.minimum_log_level = GFLogger.Level.NONE
+	var initialize_host := GFFrameworkHost.new()
+	_expect(
+		initialize_host.boot(initialize_config) == ERR_BUSY,
+		"Module initialization cannot revive a host after requesting shutdown",
+	)
+	_expect(
+		not initialize_host.is_booted() and initialize_host.modules == null,
+		"Initialization shutdown leaves the framework fully stopped",
+	)
+	initialize_host.free()
+
+	var start_definition := GFModuleDefinition.new()
+	start_definition.declared_id = &"start_shutdown_host"
+	start_definition.module_script = GFStartShutdownHostTestModule
+	var start_config := GFFrameworkConfig.new()
+	start_config.modules = [start_definition]
+	start_config.minimum_log_level = GFLogger.Level.NONE
+	var start_host := GFFrameworkHost.new()
+	_expect(
+		start_host.boot(start_config) == ERR_BUSY,
+		"Module startup cannot revive a host after requesting shutdown",
+	)
+	_expect(
+		not start_host.is_booted() and start_host.modules == null,
+		"Startup shutdown leaves the framework fully stopped",
+	)
+	start_host.free()
 
 
 func _test_service_container() -> void:
@@ -1411,6 +1471,52 @@ func _test_storage_service_and_migration() -> void:
 	_expect(storage.load(&"profile") == {"score": 5}, "Storage data round-trips")
 	_expect(storage.save(&"profile", {"score": 6}) == OK, "Storage atomically replaces existing slot")
 	_expect(FileAccess.file_exists("%s.bak1" % storage.path_for(&"profile")), "Storage keeps configured backup")
+	var recovered_paths: Array[String] = []
+	storage.recovered.connect(func(_slot: StringName, path: String) -> void: recovered_paths.append(path))
+	var corrupt_primary := FileAccess.open(storage.path_for(&"profile"), FileAccess.WRITE)
+	corrupt_primary.store_string("corrupt")
+	corrupt_primary.close()
+	_expect(storage.load(&"profile") == {"score": 5}, "Storage falls back to the newest valid backup")
+	_expect(
+		recovered_paths == ["%s.bak1" % storage.path_for(&"profile")],
+		"Storage reports the backup path used for recovery",
+	)
+	_expect(storage.save(&"profile", {"score": 7}) == OK, "Storage replaces a corrupt primary after recovery")
+	var corrupt_replacement := FileAccess.open(storage.path_for(&"profile"), FileAccess.WRITE)
+	corrupt_replacement.store_string("corrupt again")
+	corrupt_replacement.close()
+	_expect(
+		storage.load(&"profile") == {"score": 5},
+		"Replacing a corrupt primary does not overwrite the valid recovery backup",
+	)
+	_expect(storage.exists(&"profile"), "Storage reports a recoverable slot when its primary exists")
+	DirAccess.remove_absolute(storage.path_for(&"profile"))
+	_expect(storage.exists(&"profile"), "Storage reports a slot that exists only as a backup")
+	_expect(storage.load(&"profile") == {"score": 5}, "Storage recovers when replacement was interrupted")
+	_expect(storage.save(&"profile", {"score": 6}) == OK, "Storage can replace a recovered slot")
+	var legacy_path := storage.path_for(&"legacy")
+	var legacy_file := FileAccess.open(legacy_path, FileAccess.WRITE)
+	legacy_file.store_var({"schema_version": 1, "saved_at": "", "data": {"score": 4}}, false)
+	legacy_file.close()
+	_expect(storage.load(&"legacy") == {"score": 4}, "Storage reads legacy object-free Variant envelopes")
+	storage.delete(&"legacy")
+	var bounded_settings := version_one.duplicate() as GFStorageSettings
+	bounded_settings.max_file_bytes = 1024
+	var bounded_storage := GFStorageService.new(bounded_settings)
+	_expect(
+		bounded_storage.save(&"oversized", {"payload": "x".repeat(2048)}) == ERR_OUT_OF_MEMORY,
+		"Storage rejects saves above the configured file size limit",
+	)
+	_expect(not bounded_storage.exists(&"oversized"), "Rejected oversized saves do not create a slot")
+	var oversized_path := bounded_storage.path_for(&"oversized_read")
+	var oversized_file := FileAccess.open(oversized_path, FileAccess.WRITE)
+	oversized_file.store_buffer("x".repeat(2048).to_utf8_buffer())
+	oversized_file.close()
+	_expect(
+		bounded_storage.load(&"oversized_read", {"fallback": true}) == {"fallback": true},
+		"Storage rejects oversized files before decoding their payload",
+	)
+	bounded_storage.delete(&"oversized_read")
 
 	var version_two := version_one.duplicate() as GFStorageSettings
 	version_two.schema_version = 2

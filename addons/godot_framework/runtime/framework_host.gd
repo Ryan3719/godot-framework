@@ -17,6 +17,7 @@ var modules: GFModuleManager
 
 var _context: GFContext
 var _booted := false
+var _shutting_down := false
 
 
 func _ready() -> void:
@@ -28,7 +29,7 @@ func _ready() -> void:
 
 
 func boot(override_config: GFFrameworkConfig = null) -> Error:
-	if _booted or modules != null:
+	if _booted or modules != null or _shutting_down:
 		return ERR_ALREADY_IN_USE
 	config = override_config if override_config != null else _load_config()
 	if config == null:
@@ -43,14 +44,15 @@ func boot(override_config: GFFrameworkConfig = null) -> Error:
 	logger = GFLogger.new()
 	logger.minimum_level = config.minimum_log_level
 	_context = GFContext.new(self, services, events, messages, logger)
-	modules = GFModuleManager.new(_context)
+	var active_modules := GFModuleManager.new(_context)
+	modules = active_modules
 
 	services.register(GFServiceIds.FRAMEWORK, self)
 	services.register(GFServiceIds.SERVICES, services)
 	services.register(GFServiceIds.EVENTS, events)
 	services.register(GFServiceIds.MESSAGES, messages)
 	services.register(GFServiceIds.LOGGER, logger)
-	services.register(GFServiceIds.MODULES, modules)
+	services.register(GFServiceIds.MODULES, active_modules)
 
 	for definition: GFModuleDefinition in config.modules:
 		if definition == null:
@@ -60,28 +62,33 @@ func boot(override_config: GFFrameworkConfig = null) -> Error:
 		var module := definition.instantiate_module()
 		if module == null:
 			return _boot_failure(ERR_CANT_CREATE, definition.last_error)
-		var install_result := modules.install(module)
+		var install_result := active_modules.install(module)
 		if install_result != OK:
-			return _boot_failure(install_result, modules.last_error)
+			return _boot_failure(install_result, active_modules.last_error)
 
-	var result := modules.initialize_all()
+	var result := active_modules.initialize_all()
 	if result != OK:
-		return _boot_failure(result, modules.last_error)
-	result = modules.start_all()
+		return _boot_failure(result, active_modules.last_error)
+	if not is_same(modules, active_modules):
+		return _boot_failure(ERR_BUSY, "Framework initialization was interrupted by shutdown.")
+	result = active_modules.start_all()
 	if result != OK:
-		return _boot_failure(result, modules.last_error)
+		return _boot_failure(result, active_modules.last_error)
+	if not is_same(modules, active_modules):
+		return _boot_failure(ERR_BUSY, "Framework startup was interrupted by shutdown.")
 
 	_booted = true
 	set_process(true)
 	set_physics_process(true)
-	logger.info(&"framework", "Framework boot completed.", {"modules": modules.ordered_ids()})
+	logger.info(&"framework", "Framework boot completed.", {"modules": active_modules.ordered_ids()})
 	boot_completed.emit()
 	return OK
 
 
 func shutdown() -> void:
-	if modules == null:
+	if modules == null or _shutting_down:
 		return
+	_shutting_down = true
 	set_process(false)
 	set_physics_process(false)
 	modules.shutdown_all()
@@ -99,6 +106,7 @@ func shutdown() -> void:
 	services = null
 	config = null
 	_booted = false
+	_shutting_down = false
 	shutdown_completed.emit()
 
 
@@ -113,12 +121,21 @@ func get_service(service_id: StringName, default: Variant = null) -> Variant:
 
 
 func _process(delta: float) -> void:
-	modules.update(delta)
-	events.flush(config.max_queued_events_per_frame)
+	var active_modules := modules
+	var active_events := events
+	var active_config := config
+	if active_modules == null or active_events == null or active_config == null:
+		return
+	active_modules.update(delta)
+	if not _booted or not is_same(modules, active_modules) or not is_same(events, active_events):
+		return
+	active_events.flush(active_config.max_queued_events_per_frame)
 
 
 func _physics_process(delta: float) -> void:
-	modules.physics_update(delta)
+	var active_modules := modules
+	if active_modules != null:
+		active_modules.physics_update(delta)
 
 
 func _exit_tree() -> void:
@@ -136,11 +153,17 @@ func _load_config() -> GFFrameworkConfig:
 
 
 func _boot_failure(error: Error, message: String) -> Error:
+	_shutting_down = true
+	set_process(false)
+	set_physics_process(false)
 	if logger != null:
 		logger.error(&"framework", message, {"error": error})
 	if modules != null:
 		modules.shutdown_all()
-	boot_failed.emit(error, message)
+	if events != null:
+		events.clear()
+	if messages != null:
+		messages.clear()
 	if services != null:
 		services.clear()
 	modules = null
@@ -150,4 +173,7 @@ func _boot_failure(error: Error, message: String) -> Error:
 	logger = null
 	services = null
 	config = null
+	_booted = false
+	_shutting_down = false
+	boot_failed.emit(error, message)
 	return error

@@ -12,6 +12,7 @@ The framework bounds cross-frame work where untrusted production rates could oth
 | Threaded resources | `max_pending_threaded_requests` total and `max_threaded_requests_per_frame` polls per frame |
 | Downloads | `max_in_flight_tasks`, active concurrency, retained terminal history, retry count, and streamed temporary files |
 | Correlation tracking | `request_max_pending` unresolved request records |
+| Storage | `max_file_bytes` per checksummed save or backup before allocation and decoding |
 
 Defaults are conservative starting points, not universal tuning values. Profile realistic project payloads and exported target platforms before changing them.
 

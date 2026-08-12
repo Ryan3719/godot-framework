@@ -3,8 +3,12 @@ extends RefCounted
 
 signal saved(slot: StringName, path: String)
 signal loaded(slot: StringName, path: String)
+signal recovered(slot: StringName, backup_path: String)
 signal deleted(slot: StringName)
 signal operation_failed(operation: StringName, slot: StringName, error: Error)
+
+const FILE_MAGIC := 0x31534647
+const CHECKSUM_BYTES := 32
 
 var settings: GFStorageSettings
 var _migrations: Dictionary = {}
@@ -38,12 +42,23 @@ func save(slot: StringName, data: Dictionary) -> Error:
 		"saved_at": Time.get_datetime_string_from_system(true),
 		"data": data,
 	}
+	var payload := var_to_bytes(envelope)
+	if payload.size() + 8 + CHECKSUM_BYTES > settings.max_file_bytes:
+		operation_failed.emit(&"save", slot, ERR_OUT_OF_MEMORY)
+		return ERR_OUT_OF_MEMORY
+	var checksum := _sha256(payload)
+	if checksum.size() != CHECKSUM_BYTES:
+		operation_failed.emit(&"save", slot, ERR_CANT_CREATE)
+		return ERR_CANT_CREATE
 	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
 		var error := FileAccess.get_open_error()
 		operation_failed.emit(&"save", slot, error)
 		return error
-	file.store_var(envelope, false)
+	file.store_32(FILE_MAGIC)
+	file.store_32(payload.size())
+	file.store_buffer(checksum)
+	file.store_buffer(payload)
 	file.flush()
 	file.close()
 
@@ -65,37 +80,34 @@ func load(slot: StringName, default: Dictionary = {}) -> Dictionary:
 		operation_failed.emit(&"load", slot, ERR_INVALID_PARAMETER)
 		return default.duplicate(true)
 	var path := path_for(slot)
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		operation_failed.emit(&"load", slot, FileAccess.get_open_error())
-		return default.duplicate(true)
-	var parsed: Variant = file.get_var(false)
-	file.close()
-	if not parsed is Dictionary:
-		operation_failed.emit(&"load", slot, ERR_FILE_CORRUPT)
-		return default.duplicate(true)
-	var envelope := parsed as Dictionary
-	var version := int(envelope.get("schema_version", 0))
-	var data: Variant = envelope.get("data")
-	if not data is Dictionary or version > settings.schema_version:
-		operation_failed.emit(&"load", slot, ERR_INVALID_DATA)
-		return default.duplicate(true)
-	while version < settings.schema_version:
-		var migration: Callable = _migrations.get(version, Callable())
-		if not migration.is_valid():
-			operation_failed.emit(&"load", slot, ERR_UNCONFIGURED)
-			return default.duplicate(true)
-		data = migration.call(data)
-		if not data is Dictionary:
-			operation_failed.emit(&"load", slot, ERR_INVALID_DATA)
-			return default.duplicate(true)
-		version += 1
-	loaded.emit(slot, path)
-	return (data as Dictionary).duplicate(true)
+	var candidates: Array[String] = [path]
+	for index in range(1, settings.backup_count + 1):
+		candidates.append("%s.bak%d" % [path, index])
+	var failure := ERR_FILE_NOT_FOUND
+	for candidate: String in candidates:
+		if not FileAccess.file_exists(candidate):
+			continue
+		var result := _load_path(candidate)
+		if bool(result.valid):
+			loaded.emit(slot, candidate)
+			if candidate != path:
+				recovered.emit(slot, candidate)
+			return (result.data as Dictionary).duplicate(true)
+		failure = result.error as Error
+	operation_failed.emit(&"load", slot, failure)
+	return default.duplicate(true)
 
 
 func exists(slot: StringName) -> bool:
-	return _valid_slot(slot) and FileAccess.file_exists(path_for(slot))
+	if not _valid_slot(slot):
+		return false
+	var path := path_for(slot)
+	if FileAccess.file_exists(path):
+		return true
+	for index in range(1, settings.backup_count + 1):
+		if FileAccess.file_exists("%s.bak%d" % [path, index]):
+			return true
+	return false
 
 
 func delete(slot: StringName, include_backups := true) -> Error:
@@ -134,6 +146,8 @@ func _valid_slot(slot: StringName) -> bool:
 func _rotate_backups(path: String) -> Error:
 	if not FileAccess.file_exists(path):
 		return OK
+	if not bool(_read_envelope(path).valid):
+		return DirAccess.remove_absolute(path)
 	if settings.backup_count <= 0:
 		return DirAccess.remove_absolute(path)
 	for index in range(settings.backup_count, 0, -1):
@@ -148,6 +162,100 @@ func _rotate_backups(path: String) -> Error:
 			if rename_result != OK:
 				return rename_result
 	return OK
+
+
+func _load_path(path: String) -> Dictionary:
+	var decoded := _read_envelope(path)
+	if not bool(decoded.valid):
+		return decoded
+	var envelope := decoded.envelope as Dictionary
+	var version := int(envelope.schema_version)
+	var data: Variant = envelope.data
+	if version > settings.schema_version:
+		return {"valid": false, "error": ERR_INVALID_DATA}
+	while version < settings.schema_version:
+		var migration: Callable = _migrations.get(version, Callable())
+		if not migration.is_valid():
+			return {"valid": false, "error": ERR_UNCONFIGURED}
+		data = migration.call(data)
+		if not data is Dictionary or not _is_serializable(data, []):
+			return {"valid": false, "error": ERR_INVALID_DATA}
+		version += 1
+	return {"valid": true, "data": data, "error": OK}
+
+
+func _read_envelope(path: String) -> Dictionary:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"valid": false, "error": FileAccess.get_open_error()}
+	if file.get_length() > settings.max_file_bytes:
+		file.close()
+		return {"valid": false, "error": ERR_OUT_OF_MEMORY}
+	if file.get_length() < 4:
+		file.close()
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var marker := file.get_32()
+	if marker != FILE_MAGIC:
+		var legacy_result := _read_legacy_envelope(file, marker)
+		file.close()
+		return legacy_result
+	var header_size := 8 + CHECKSUM_BYTES
+	if file.get_length() < header_size:
+		file.close()
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var payload_size := file.get_32()
+	var checksum := file.get_buffer(CHECKSUM_BYTES)
+	if payload_size != file.get_length() - header_size:
+		file.close()
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var payload := file.get_buffer(payload_size)
+	file.close()
+	if payload.size() != payload_size or _sha256(payload) != checksum:
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var parsed: Variant = bytes_to_var(payload)
+	if not parsed is Dictionary:
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var envelope := parsed as Dictionary
+	var raw_version: Variant = envelope.get("schema_version")
+	var data: Variant = envelope.get("data")
+	if (
+		not raw_version is int
+		or int(raw_version) < 1
+		or not data is Dictionary
+		or not _is_serializable(data, [])
+	):
+		return {"valid": false, "error": ERR_INVALID_DATA}
+	return {"valid": true, "envelope": envelope, "error": OK}
+
+
+func _read_legacy_envelope(file: FileAccess, payload_size: int) -> Dictionary:
+	if payload_size <= 0 or payload_size != file.get_length() - 4:
+		return {"valid": false, "error": ERR_FILE_UNRECOGNIZED}
+	var payload := file.get_buffer(payload_size)
+	if payload.size() != payload_size:
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var parsed: Variant = bytes_to_var(payload)
+	if not parsed is Dictionary:
+		return {"valid": false, "error": ERR_FILE_CORRUPT}
+	var envelope := parsed as Dictionary
+	var raw_version: Variant = envelope.get("schema_version")
+	var data: Variant = envelope.get("data")
+	if (
+		not raw_version is int
+		or int(raw_version) < 1
+		or not data is Dictionary
+		or not _is_serializable(data, [])
+	):
+		return {"valid": false, "error": ERR_INVALID_DATA}
+	return {"valid": true, "envelope": envelope, "error": OK}
+
+
+func _sha256(data: PackedByteArray) -> PackedByteArray:
+	var hasher := HashingContext.new()
+	if hasher.start(HashingContext.HASH_SHA256) != OK:
+		return PackedByteArray()
+	hasher.update(data)
+	return hasher.finish()
 
 
 func _is_serializable(value: Variant, ancestors: Array[Variant]) -> bool:

@@ -15,7 +15,7 @@ env:
 jobs:
   godot:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -29,7 +29,7 @@ jobs:
         with:
           version: ${{ matrix.godot-version }}
           use-dotnet: false
-          include-templates: false
+          include-templates: true
 
       - name: Import and parse project
         run: |
@@ -99,3 +99,4 @@ jobs:
           python3 scripts/package_addon.py --output "$package_path"
           python3 scripts/verify_addon_package.py "$package_path"
           bash tests/verify_addon_package.sh "$package_path" "$(command -v godot)"
+          bash tests/verify_linux_export.sh "$package_path" "$(command -v godot)"

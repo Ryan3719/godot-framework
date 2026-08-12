@@ -1,5 +1,9 @@
 # Upgrading
 
+## Storage Envelope
+
+Storage files written before `0.5.0` used Godot's length-prefixed Variant encoding. The current reader accepts that legacy object-free envelope, while new saves add a framework header and SHA-256 checksum. Saving a loaded legacy slot upgrades the primary file automatically; configured backups remain readable in either format. Project-owned `GFStorageSettings` resources should set `max_file_bytes`; the default is 16 MiB and applies before allocating or decoding a save payload.
+
 ## General Procedure
 
 1. Read [CHANGELOG.md](../CHANGELOG.md) for behavior and API changes between the pinned and target versions.
