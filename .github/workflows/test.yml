@@ -103,7 +103,7 @@ jobs:
           cp "$package_path.sha256" "package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt"
 
       - name: Upload addon package checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: package-sha-${{ runner.os }}-${{ matrix.godot-version }}
           path: package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt
@@ -140,7 +140,7 @@ jobs:
           cp "$package_path.sha256" "package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt"
 
       - name: Upload addon package checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: package-sha-${{ runner.os }}-${{ matrix.godot-version }}
           path: package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt
@@ -180,7 +180,7 @@ jobs:
           Copy-Item "$packagePath.sha256" "package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt"
 
       - name: Upload addon package checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: package-sha-${{ runner.os }}-${{ matrix.godot-version }}
           path: package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt
@@ -193,7 +193,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download addon package checksums
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: package-sha-*
           path: package-sha
