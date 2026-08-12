@@ -70,7 +70,9 @@ try {
         throw "Windows export runtime marker was not found."
     }
     foreach ($LogPath in @($EditorLog, $ExportLog, $RunLog)) {
-        if (Select-String -Path $LogPath -Pattern $FailurePattern) {
+        $Matches = Select-String -Path $LogPath -Pattern $FailurePattern
+        if ($Matches) {
+            $Matches | ForEach-Object { Write-Output $_.Line }
             throw "Framework error or leak marker found in $LogPath."
         }
     }
