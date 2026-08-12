@@ -56,10 +56,16 @@ Exit criteria for a stable release: exported desktop/Web/mobile validation, TLS 
 
 ## 0.5 Tooling And Distribution
 
-- Framework configuration inspector and validation dock
-- Godot Asset Library-compatible package
-- Semantic versioning, changelog, upgrade guides, and API stability tiers
-- Performance benchmarks and allocation budgets
+Status: implemented in the current development branch. Asset Library publication and release-tag creation remain maintainer operations.
+
+- Framework configuration validator, structured issue codes, editor dock, and headless runner
+- Declarative module metadata that can be validated without executing runtime modules in the editor
+- Deterministic Godot Asset Library-compatible package with checksum and clean-project installation test
+- Release-tag workflow with exact version matching and development-version rejection
+- Semantic versioning, changelog, upgrade guide, distribution guide, and API stability tiers
+- Bounded event backlog and performance smoke benchmarks with machine-readable results
+
+Exit criteria: Godot 4.4.1 and 4.7.1 validation, reproducible addon-only ZIP output, clean-project installation, documented compatibility policy, and no application-specific content.
 
 ## Explicit Non-Goals
 

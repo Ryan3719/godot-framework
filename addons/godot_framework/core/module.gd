@@ -27,6 +27,10 @@ func configure(module_settings: Resource) -> void:
 	settings = module_settings
 
 
+func validate_configuration() -> String:
+	return ""
+
+
 func initialize() -> Error:
 	return OK
 

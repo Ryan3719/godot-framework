@@ -1,3 +1,4 @@
+@tool
 class_name GFContentSettings
 extends Resource
 
@@ -13,6 +14,8 @@ func validate() -> String:
 		return "Content base directory must be a non-root path inside user://."
 	if require_signature and public_key_pem.strip_edges().is_empty():
 		return "Signed content requires an RSA public key."
+	if max_manifest_bytes < 1024:
+		return "Content manifest limit must be at least 1024 bytes."
 	return ""
 
 

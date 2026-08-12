@@ -29,76 +29,101 @@
 
 [sub_resource type="Resource" id="ModuleDefinition_resource"]
 script = ExtResource("2_definition")
+declared_id = &"resource"
 module_script = ExtResource("3_resource_module")
+expected_settings_class = &"GFResourceSettings"
 settings = ExtResource("4_resource_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_scene"]
 script = ExtResource("2_definition")
+declared_id = &"scene"
+declared_dependencies = Array[StringName]([&"resource"])
 module_script = ExtResource("5_scene_module")
 
 [sub_resource type="Resource" id="ModuleDefinition_storage"]
 script = ExtResource("2_definition")
+declared_id = &"storage"
 module_script = ExtResource("6_storage_module")
+expected_settings_class = &"GFStorageSettings"
 settings = ExtResource("7_storage_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_settings"]
 script = ExtResource("2_definition")
+declared_id = &"settings"
 module_script = ExtResource("8_settings_module")
+expected_settings_class = &"GFSettingsSettings"
 settings = ExtResource("9_settings_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_pool"]
 script = ExtResource("2_definition")
+declared_id = &"pool"
 module_script = ExtResource("10_pool_module")
 
 [sub_resource type="Resource" id="ModuleDefinition_fsm"]
 script = ExtResource("2_definition")
+declared_id = &"state_machine"
 module_script = ExtResource("11_fsm_module")
 
 [sub_resource type="Resource" id="ModuleDefinition_ui"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"ui"
 module_script = ExtResource("12_ui_module")
+expected_settings_class = &"GFUISettings"
 settings = ExtResource("13_ui_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_audio"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"audio"
 module_script = ExtResource("14_audio_module")
+expected_settings_class = &"GFAudioSettings"
 settings = ExtResource("15_audio_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_input"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"input"
 module_script = ExtResource("16_input_module")
+expected_settings_class = &"GFInputSettings"
 settings = ExtResource("17_input_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_localization"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"localization"
 module_script = ExtResource("18_localization_module")
+expected_settings_class = &"GFLocalizationSettings"
 settings = ExtResource("19_localization_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_download"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"download"
 module_script = ExtResource("20_download_module")
+expected_settings_class = &"GFDownloadSettings"
 settings = ExtResource("21_download_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_content"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"content"
 module_script = ExtResource("22_content_module")
+expected_settings_class = &"GFContentSettings"
 settings = ExtResource("23_content_settings")
 
 [sub_resource type="Resource" id="ModuleDefinition_tables"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"tables"
 module_script = ExtResource("24_table_module")
 
 [sub_resource type="Resource" id="ModuleDefinition_connectivity"]
 script = ExtResource("2_definition")
 enabled = false
+declared_id = &"connectivity"
 module_script = ExtResource("25_connectivity_module")
+expected_settings_class = &"GFConnectivitySettings"
 settings = ExtResource("26_connectivity_settings")
 
 [resource]

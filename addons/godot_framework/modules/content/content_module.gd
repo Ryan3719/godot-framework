@@ -9,11 +9,18 @@ func module_id() -> StringName:
 	return &"content"
 
 
+func validate_configuration() -> String:
+	if settings != null and not settings is GFContentSettings:
+		return "Content module settings must use GFContentSettings."
+	var candidate := settings as GFContentSettings if settings != null else GFContentSettings.new()
+	return candidate.validate()
+
+
 func initialize() -> Error:
 	module_settings = settings as GFContentSettings
 	if module_settings == null:
 		module_settings = GFContentSettings.new()
-	if not module_settings.validate().is_empty():
+	if not validate_configuration().is_empty():
 		return ERR_INVALID_DATA
 	service = GFContentService.new(module_settings)
 	if service.initialization_error() != OK:

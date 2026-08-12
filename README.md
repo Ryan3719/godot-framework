@@ -2,7 +2,7 @@
 
 A modular, business-agnostic game framework for Godot 4.4+.
 
-> Status: `0.4.0-dev`. Foundation, presentation, content-delivery, and connectivity modules are usable and tested, but public APIs may change before the first stable release.
+> Status: `0.5.0-dev`. Foundation, presentation, content-delivery, connectivity, validation, and distribution tooling are implemented and tested, but public APIs may change before the first stable release.
 
 Godot Framework provides reusable infrastructure without prescribing a game genre, screen flow, data model, or application architecture. It uses Godot's scene tree, signals, Resources, and loaders directly instead of recreating Unity's runtime model.
 
@@ -30,6 +30,9 @@ Godot Framework provides reusable infrastructure without prescribing a game genr
 - Bounded HTTP request queue with raw byte bodies, cancellation, timeouts, tags, and response limits
 - WebSocket channel state machines with reconnect policy, native ping intervals, receive budgets, and send backpressure
 - Protocol-neutral correlation tracker with resolve, timeout, and cancellation lifecycles
+- Configuration validator with structured issue codes and an editor dock
+- Bounded queued-event memory with explicit overflow errors
+- Deterministic Asset Library-compatible addon packaging and clean-project installation checks
 
 Every feature except the small runtime kernel is optional through `GFFrameworkConfig`.
 
@@ -83,14 +86,18 @@ func shutdown() -> void:
 
 Add the script to a `GFModuleDefinition` in your project-owned `GFFrameworkConfig`. See [Extending the framework](docs/extending.md) for lifecycle and ownership rules.
 
+Every definition declares `declared_id` and `declared_dependencies` in addition to its script. The framework validates these declarations without running module code in the editor, then verifies them against the instantiated module at runtime.
+
 ## Verify
 
 ```bash
 godot --headless --editor --quit --path .
 godot --headless --verbose --path .
+godot --headless --verbose --path . tests/config_validation_runner.tscn
+godot --headless --verbose --path . tests/performance_runner.tscn
 ```
 
-The test project currently runs 303 assertions plus end-to-end scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests, and exits non-zero on failure. CI treats parse errors, engine errors, leaked objects, and resources left in use as failures.
+The test project currently runs 327 assertions plus configuration, performance-smoke, clean-package installation, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. The CI matrix uses Godot 4.4.1 and 4.7.1 and treats parse errors, engine errors, leaked objects, and resources left in use as failures.
 
 ## Documentation
 
@@ -100,6 +107,11 @@ The test project currently runs 303 assertions plus end-to-end scene-transition,
 - [Roadmap](docs/roadmap.md)
 - [Content delivery](docs/content_delivery.md)
 - [Connectivity](docs/connectivity.md)
+- [Distribution](docs/distribution.md)
+- [Performance](docs/performance.md)
+- [Versioning and API stability](docs/versioning.md)
+- [Upgrading](docs/upgrading.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

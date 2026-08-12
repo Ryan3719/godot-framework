@@ -9,7 +9,16 @@ func module_id() -> StringName:
 	return &"resource"
 
 
+func validate_configuration() -> String:
+	if settings != null and not settings is GFResourceSettings:
+		return "Resource module settings must use GFResourceSettings."
+	var candidate := settings as GFResourceSettings if settings != null else GFResourceSettings.new()
+	return candidate.validate()
+
+
 func initialize() -> Error:
+	if not validate_configuration().is_empty():
+		return ERR_INVALID_DATA
 	module_settings = settings as GFResourceSettings
 	if module_settings == null:
 		module_settings = GFResourceSettings.new()

@@ -9,7 +9,16 @@ func module_id() -> StringName:
 	return &"storage"
 
 
+func validate_configuration() -> String:
+	if settings != null and not settings is GFStorageSettings:
+		return "Storage module settings must use GFStorageSettings."
+	var candidate := settings as GFStorageSettings if settings != null else GFStorageSettings.new()
+	return candidate.validate()
+
+
 func initialize() -> Error:
+	if not validate_configuration().is_empty():
+		return ERR_INVALID_DATA
 	module_settings = settings as GFStorageSettings
 	if module_settings == null:
 		module_settings = GFStorageSettings.new()

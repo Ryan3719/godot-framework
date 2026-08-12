@@ -46,7 +46,15 @@ extends Resource
 @export_range(1, 60, 1) var timeout_seconds := 10
 ```
 
-Create a `GFModuleDefinition`, assign the module script and settings resource, and append it to the project's `GFFrameworkConfig`.
+Create a `GFModuleDefinition`, assign the following fields, and append it to the project's `GFFrameworkConfig`:
+
+- `declared_id`: exactly the value returned by `module_id()`
+- `declared_dependencies`: exactly the array returned by `dependencies()`
+- `module_script`: the script extending `GFModule`
+- `expected_settings_class`: the global class name of the settings resource, when the module has typed settings
+- `settings`: the project-owned settings resource, when required
+
+The declaration is intentionally redundant. Editor validation can inspect it without instantiating runtime modules, while boot verifies it against the module script and refuses mismatches. Keep both sides synchronized when an ID or dependency changes.
 
 The default configuration already contains disabled definitions for UI, audio, input, localization, download, content, tables, and connectivity. Duplicate the framework and relevant settings resources outside `addons/`, then enable the definitions in the project copy. Do not edit addon defaults because an upgrade can replace them.
 
@@ -76,6 +84,8 @@ Consumers resolve a capability during use or retain it only within a clearly sho
 
 Events are facts and use past-tense IDs such as `save.completed`. Commands are requests and use verbs such as `profile.save`. Queries describe reads such as `profile.current`.
 
+Queued events have a framework-wide capacity configured by `GFFrameworkConfig.max_queued_events`. Check the `Error` returned by `queue()` when delivery matters; `ERR_OUT_OF_MEMORY` means the bounded backlog rejected the new event. `max_queued_events_per_frame` controls consumption and does not change total capacity.
+
 ## State Machines
 
 `GFStateMachine` is deliberately generic. Define application states outside the addon. States receive a weak reference to their machine through `get_machine()`, preventing `RefCounted` cycles. Call `clear()` when a machine's owner ends.
@@ -87,6 +97,7 @@ Add deterministic headless assertions to `tests/test_runner.gd`. Tests must cove
 ```bash
 godot --headless --editor --quit --path .
 godot --headless --verbose --path .
+godot --headless --verbose --path . tests/config_validation_runner.tscn
 ```
 
 Treat leak warnings as failures even when Godot exits with code zero.

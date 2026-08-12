@@ -9,11 +9,18 @@ func module_id() -> StringName:
 	return &"connectivity"
 
 
+func validate_configuration() -> String:
+	if settings != null and not settings is GFConnectivitySettings:
+		return "Connectivity module settings must use GFConnectivitySettings."
+	var candidate := settings as GFConnectivitySettings if settings != null else GFConnectivitySettings.new()
+	return candidate.validate()
+
+
 func initialize() -> Error:
 	module_settings = settings as GFConnectivitySettings
 	if module_settings == null:
 		module_settings = GFConnectivitySettings.new()
-	var validation := module_settings.validate()
+	var validation := validate_configuration()
 	if not validation.is_empty():
 		return ERR_INVALID_DATA
 	service = GFConnectivityService.new(context.host, module_settings)

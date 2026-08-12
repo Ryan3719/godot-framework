@@ -53,9 +53,13 @@ Use the narrowest mechanism that fits:
 
 The event bus does not replace every Godot signal. Signals remain the natural API inside a scene or component boundary. The bus is for cross-system events where sender and receivers should not know one another.
 
+Queued events are bounded by `max_queued_events`; producers receive `ERR_OUT_OF_MEMORY` instead of growing the backlog without limit. The independent `max_queued_events_per_frame` budget bounds dispatch work in each process frame. Applications that cannot drop an event must handle the enqueue error or use a persistence-aware project service.
+
 ## Configuration
 
 Framework and module configuration uses typed Godot `Resource` objects. The addon includes defaults, but projects should duplicate them outside `addons/` and reference their copy through `godot_framework/config_path`.
+
+Each module definition repeats its ID and dependencies as declarative metadata. The editor validator checks the dependency graph and settings without executing runtime module scripts; boot instantiates enabled modules and rejects metadata that differs from `module_id()` or `dependencies()`.
 
 Resources hold authorable configuration. Runtime save data is restricted to object-free Variants and never serializes `Node`, `Resource`, texture, audio, or arbitrary script objects.
 

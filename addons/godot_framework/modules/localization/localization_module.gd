@@ -10,7 +10,16 @@ func module_id() -> StringName:
 	return &"localization"
 
 
+func validate_configuration() -> String:
+	if settings != null and not settings is GFLocalizationSettings:
+		return "Localization module settings must use GFLocalizationSettings."
+	var candidate := settings as GFLocalizationSettings if settings != null else GFLocalizationSettings.new()
+	return candidate.validate()
+
+
 func initialize() -> Error:
+	if not validate_configuration().is_empty():
+		return ERR_INVALID_DATA
 	module_settings = settings as GFLocalizationSettings
 	if module_settings == null:
 		module_settings = GFLocalizationSettings.new()

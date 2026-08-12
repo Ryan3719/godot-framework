@@ -37,6 +37,10 @@ func initialize_all() -> Error:
 	var resolve_result := _resolve_dependencies()
 	if resolve_result != OK:
 		return resolve_result
+	for id: StringName in _resolved_order:
+		var validation := (_modules[id] as GFModule).validate_configuration()
+		if not validation.is_empty():
+			return _fail(ERR_INVALID_DATA, "Module '%s' configuration is invalid: %s" % [id, validation])
 	var initialized: Array[GFModule] = []
 	for id: StringName in _resolved_order:
 		var module: GFModule = _modules[id]

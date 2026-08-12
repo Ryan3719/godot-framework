@@ -12,6 +12,7 @@ func _ready() -> void:
 	_test_message_bus()
 	_test_module_dependencies_and_lifecycle()
 	_test_module_failure_rollback()
+	_test_framework_validator()
 	_test_optional_module_lifecycle()
 	_test_state_machine()
 	_test_object_pool()
@@ -36,6 +37,10 @@ func _test_default_framework_boot() -> void:
 		return
 	_expect(framework.is_booted(), "Default framework configuration boots")
 	_expect(framework.get_service(GFServiceIds.EVENTS) is GFEventBus, "Event service is registered")
+	_expect(
+		framework.events.queue_capacity() == framework.config.max_queued_events,
+		"Framework host applies the configured event queue capacity",
+	)
 	_expect(framework.get_service(GFServiceIds.MESSAGES) is GFMessageBus, "Message service is registered")
 	_expect(framework.get_service(GFServiceIds.RESOURCES) is GFResourceService, "Resource module is registered")
 	_expect(framework.get_service(GFServiceIds.SCENES) is GFSceneService, "Scene module is registered")
@@ -91,10 +96,41 @@ func _test_event_bus() -> void:
 
 	var queued: Array[int] = []
 	events.subscribe(&"queued", func(value: Variant) -> void: queued.append(int(value)))
-	events.queue(&"queued", 1)
-	events.queue(&"queued", 2)
+	_expect(events.queue(&"") == ERR_INVALID_PARAMETER, "Event queue rejects an empty event ID")
+	_expect(events.queue(&"queued", 1) == OK, "Event queue accepts an event within capacity")
+	_expect(events.queue(&"queued", 2) == OK, "Event queue accepts a second event within capacity")
 	_expect(events.flush(1) == 1 and events.queued_count() == 1, "Event flush limit defers overflow")
 	_expect(events.flush() == 1 and queued == [1, 2], "Queued events preserve FIFO order")
+
+	var bounded_events := GFEventBus.new(2)
+	_expect(bounded_events.queue_capacity() == 2, "Event queue exposes its configured capacity")
+	_expect(
+		bounded_events.queue(&"bounded", 1) == OK
+		and bounded_events.queue(&"bounded", 2) == OK
+		and bounded_events.queue(&"bounded", 3) == ERR_OUT_OF_MEMORY,
+		"Event queue rejects new events when its capacity is exhausted",
+	)
+	bounded_events.flush(1)
+	_expect(
+		bounded_events.queue(&"bounded", 3) == OK and bounded_events.queued_count() == 2,
+		"Event queue accepts new events after capacity is released",
+	)
+	bounded_events.clear(&"bounded")
+	_expect(
+		bounded_events.queued_count() == 0,
+		"Event clear removes queued entries even when the event has no subscribers",
+	)
+	var compacted_events := GFEventBus.new(2048)
+	for index in 2048:
+		compacted_events.queue(&"compacted", index)
+	_expect(
+		compacted_events.flush(1536) == 1536 and compacted_events.queued_count() == 512,
+		"Event queue compaction preserves the unprocessed backlog",
+	)
+	_expect(
+		compacted_events.flush() == 512 and compacted_events.queued_count() == 0,
+		"Event queue drains correctly after compaction",
+	)
 	events.clear()
 
 
@@ -176,6 +212,128 @@ func _test_module_failure_rollback() -> void:
 			"shutdown:first",
 		],
 		"Start failure shuts down every initialized module in reverse order",
+	)
+
+
+func _test_framework_validator() -> void:
+	var validator := GFFrameworkValidator.new()
+	var default_config := load("res://addons/godot_framework/config/default_framework_config.tres") as GFFrameworkConfig
+	var valid_issues := validator.validate(default_config)
+	_expect(
+		valid_issues.size() == 1
+		and valid_issues[0].code == &"config.valid"
+		and not validator.has_errors(valid_issues),
+		"Framework validator accepts the addon default configuration",
+	)
+	_expect(
+		validator.validate_path("res://missing-framework-config.tres")[0].code == &"config.not_found",
+		"Framework validator reports a missing configuration path",
+	)
+	var invalid_capacity := GFFrameworkConfig.new()
+	invalid_capacity.max_queued_events = 0
+	_expect(
+		invalid_capacity.validate().contains("capacity"),
+		"Framework configuration rejects a non-positive event queue capacity",
+	)
+
+	var invalid_config := GFFrameworkConfig.new()
+	var empty_id := GFModuleDefinition.new()
+	empty_id.module_script = GFPoolModule
+	var duplicate_a := GFModuleDefinition.new()
+	duplicate_a.declared_id = &"duplicate"
+	duplicate_a.module_script = GFPoolModule
+	var duplicate_b := GFModuleDefinition.new()
+	duplicate_b.declared_id = &"duplicate"
+	duplicate_b.module_script = GFPoolModule
+	var disabled_dependency := GFModuleDefinition.new()
+	disabled_dependency.enabled = false
+	disabled_dependency.declared_id = &"provider"
+	disabled_dependency.module_script = GFPoolModule
+	var consumer := GFModuleDefinition.new()
+	consumer.declared_id = &"consumer"
+	consumer.declared_dependencies = [&"provider"]
+	consumer.module_script = GFPoolModule
+	var cycle_a := GFModuleDefinition.new()
+	cycle_a.declared_id = &"cycle_a"
+	cycle_a.declared_dependencies = [&"cycle_b"]
+	cycle_a.module_script = GFPoolModule
+	var cycle_b := GFModuleDefinition.new()
+	cycle_b.declared_id = &"cycle_b"
+	cycle_b.declared_dependencies = [&"cycle_a"]
+	cycle_b.module_script = GFPoolModule
+	var wrong_settings := GFModuleDefinition.new()
+	wrong_settings.declared_id = &"wrong_settings"
+	wrong_settings.module_script = GFPoolModule
+	wrong_settings.expected_settings_class = &"GFStorageSettings"
+	wrong_settings.settings = GFUISettings.new()
+	var invalid_settings := GFModuleDefinition.new()
+	invalid_settings.declared_id = &"invalid_settings"
+	invalid_settings.module_script = GFPoolModule
+	invalid_settings.expected_settings_class = &"GFStorageSettings"
+	var bad_storage := GFStorageSettings.new()
+	bad_storage.base_directory = "res://unsafe"
+	invalid_settings.settings = bad_storage
+	invalid_config.modules = [
+		empty_id,
+		duplicate_a,
+		duplicate_b,
+		disabled_dependency,
+		consumer,
+		cycle_a,
+		cycle_b,
+		wrong_settings,
+		invalid_settings,
+	]
+	var issues := validator.validate(invalid_config)
+	var codes: Array[StringName] = []
+	for issue: Dictionary in issues:
+		codes.append(issue.code)
+	_expect(validator.has_errors(issues), "Framework validator exposes aggregate error state")
+	_expect(codes.has(&"module.id_empty"), "Framework validator reports empty module IDs")
+	_expect(codes.has(&"module.id_duplicate"), "Framework validator reports duplicate module IDs")
+	_expect(codes.has(&"module.dependency_disabled"), "Framework validator reports disabled dependencies")
+	_expect(codes.has(&"module.dependency_cycle"), "Framework validator reports dependency cycles")
+	_expect(codes.has(&"module.settings_wrong_type"), "Framework validator reports settings type mismatch")
+	_expect(codes.has(&"module.settings_invalid"), "Framework validator reports invalid settings content")
+	var scriptless := GFModuleDefinition.new()
+	scriptless.declared_id = &"scriptless_duplicate"
+	var duplicate_after_scriptless := GFModuleDefinition.new()
+	duplicate_after_scriptless.declared_id = &"scriptless_duplicate"
+	duplicate_after_scriptless.module_script = GFPoolModule
+	var scriptless_config := GFFrameworkConfig.new()
+	scriptless_config.modules = [scriptless, duplicate_after_scriptless]
+	var scriptless_codes: Array[StringName] = []
+	for issue: Dictionary in validator.validate(scriptless_config):
+		scriptless_codes.append(issue.code)
+	_expect(
+		scriptless_codes.has(&"module.script_missing") and scriptless_codes.has(&"module.id_duplicate"),
+		"Framework validator reports duplicate IDs independently of script validity",
+	)
+
+	var mismatched_id := GFModuleDefinition.new()
+	mismatched_id.declared_id = &"not_pool"
+	mismatched_id.module_script = GFPoolModule
+	_expect(
+		mismatched_id.instantiate_module() == null and mismatched_id.last_error.contains("reports ID"),
+		"Module instantiation rejects a declared ID that differs from runtime metadata",
+	)
+	var mismatched_dependencies := GFModuleDefinition.new()
+	mismatched_dependencies.declared_id = &"scene"
+	mismatched_dependencies.module_script = GFSceneModule
+	_expect(
+		mismatched_dependencies.instantiate_module() == null
+		and mismatched_dependencies.last_error.contains("dependencies do not match"),
+		"Module instantiation rejects declared dependencies that differ from runtime metadata",
+	)
+	var mismatched_settings := GFModuleDefinition.new()
+	mismatched_settings.declared_id = &"pool"
+	mismatched_settings.module_script = GFPoolModule
+	mismatched_settings.expected_settings_class = &"GFStorageSettings"
+	mismatched_settings.settings = GFUISettings.new()
+	_expect(
+		mismatched_settings.instantiate_module() == null
+		and mismatched_settings.last_error.contains("settings must use"),
+		"Module instantiation enforces declared settings types at runtime",
 	)
 
 
@@ -262,7 +420,7 @@ func _test_optional_module_lifecycle() -> void:
 	invalid_input_settings.managed_actions = [&"gf_missing_action"]
 	invalid_input_module.configure(invalid_input_settings)
 	failure_manager.install(invalid_input_module)
-	_expect(failure_manager.initialize_all() == ERR_DOES_NOT_EXIST, "Invalid input configuration fails startup")
+	_expect(failure_manager.initialize_all() == ERR_INVALID_DATA, "Invalid input configuration fails before module startup")
 	_expect(
 		is_same(failure_services.resolve(GFServiceIds.INPUT), existing_input_service),
 		"Input rollback preserves a service it does not own",

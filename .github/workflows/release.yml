@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NO_COLOR: 1
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2.4.1
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: false
+
+      - name: Verify release version
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import configparser; c=configparser.ConfigParser(); c.read("addons/godot_framework/plugin.cfg"); print(c["plugin"]["version"].strip("\""))')
+          test "$GITHUB_REF_NAME" = "v$version"
+          case "$version" in *-dev*) echo "Development versions cannot be released"; exit 1;; esac
+
+      - name: Validate addon
+        run: |
+          set -o pipefail
+          godot --headless --editor --quit --path . 2>&1 | tee godot-import.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-import.log
+          godot --headless --verbose --path . tests/config_validation_runner.tscn 2>&1 | tee godot-config.log
+          grep -F "[CONFIG TEST] PASS: framework configuration is valid" godot-config.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-config.log
+
+      - name: Build and verify package
+        run: |
+          set -euo pipefail
+          version=${GITHUB_REF_NAME#v}
+          python3 scripts/package_addon.py --output "dist/godot-framework-$version.zip"
+          python3 scripts/verify_addon_package.py "dist/godot-framework-$version.zip"
+          bash tests/verify_addon_package.sh "dist/godot-framework-$version.zip" "$(command -v godot)"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "Godot Framework $GITHUB_REF_NAME"

@@ -4,14 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
+
+env:
+  NO_COLOR: 1
 
 jobs:
   godot:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        godot-version: [4.4.1, 4.7.1]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -19,7 +27,7 @@ jobs:
       - name: Install Godot
         uses: chickensoft-games/setup-godot@v2.4.1
         with:
-          version: 4.4.1
+          version: ${{ matrix.godot-version }}
           use-dotnet: false
           include-templates: false
 
@@ -34,6 +42,20 @@ jobs:
           set -o pipefail
           godot --headless --verbose --path . 2>&1 | tee godot-test.log
           ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-test.log
+
+      - name: Validate framework configuration
+        run: |
+          set -o pipefail
+          godot --headless --verbose --path . tests/config_validation_runner.tscn 2>&1 | tee godot-config-test.log
+          grep -F "[CONFIG TEST] PASS: framework configuration is valid" godot-config-test.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-config-test.log
+
+      - name: Run performance smoke test
+        run: |
+          set -o pipefail
+          godot --headless --verbose --path . tests/performance_runner.tscn 2>&1 | tee godot-performance-test.log
+          grep -F "[BENCHMARK] PASS: framework performance smoke test" godot-performance-test.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-performance-test.log
 
       - name: Run scene transition test
         run: |
@@ -68,3 +90,12 @@ jobs:
           godot --headless --verbose --path . tests/connectivity_integration_runner.tscn -- --http-url="$http_url" --websocket-url="$websocket_url" 2>&1 | tee godot-connectivity-test.log
           grep -F "[CONNECTIVITY TEST] PASS: real HTTP and WebSocket adapters" godot-connectivity-test.log
           ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-connectivity-test.log
+
+      - name: Build and install addon package
+        run: |
+          set -euo pipefail
+          package_dir=$(mktemp -d)
+          package_path="$package_dir/godot-framework.zip"
+          python3 scripts/package_addon.py --output "$package_path"
+          python3 scripts/verify_addon_package.py "$package_path"
+          bash tests/verify_addon_package.sh "$package_path" "$(command -v godot)"

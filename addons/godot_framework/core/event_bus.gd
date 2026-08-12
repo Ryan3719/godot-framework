@@ -4,8 +4,14 @@ extends RefCounted
 var _subscriptions: Dictionary = {}
 var _by_token: Dictionary = {}
 var _queue: Array[Dictionary] = []
+var _queue_head := 0
 var _next_token := 1
 var _next_order := 1
+var _max_queued_events: int
+
+
+func _init(max_queued_events := 8192) -> void:
+	_max_queued_events = maxi(max_queued_events, 1)
 
 
 func subscribe(event_id: StringName, callback: Callable, priority := 0, once := false) -> int:
@@ -63,18 +69,24 @@ func publish(event_id: StringName, payload: Variant = null) -> int:
 	return invoked
 
 
-func queue(event_id: StringName, payload: Variant = null) -> void:
+func queue(event_id: StringName, payload: Variant = null) -> Error:
 	if event_id.is_empty():
-		return
+		return ERR_INVALID_PARAMETER
+	if queued_count() >= _max_queued_events:
+		return ERR_OUT_OF_MEMORY
 	_queue.append({"event_id": event_id, "payload": payload})
+	return OK
 
 
 func flush(max_events := 1024) -> int:
 	var processed := 0
-	while not _queue.is_empty() and processed < max_events:
-		var queued: Dictionary = _queue.pop_front()
+	while _queue_head < _queue.size() and processed < max_events:
+		var queued: Dictionary = _queue[_queue_head]
+		_queue[_queue_head] = {}
+		_queue_head += 1
 		publish(queued.event_id, queued.payload)
 		processed += 1
+	_compact_queue()
 	return processed
 
 
@@ -83,13 +95,19 @@ func clear(event_id: StringName = &"") -> void:
 		_subscriptions.clear()
 		_by_token.clear()
 		_queue.clear()
+		_queue_head = 0
 		return
-	if not _subscriptions.has(event_id):
-		return
-	for token: int in (_subscriptions[event_id] as Array).duplicate():
-		_by_token.erase(token)
-	_subscriptions.erase(event_id)
-	_queue = _queue.filter(func(item: Dictionary) -> bool: return item.event_id != event_id)
+	if _subscriptions.has(event_id):
+		for token: int in (_subscriptions[event_id] as Array).duplicate():
+			_by_token.erase(token)
+		_subscriptions.erase(event_id)
+	var remaining: Array[Dictionary] = []
+	for index in range(_queue_head, _queue.size()):
+		var item: Dictionary = _queue[index]
+		if item.event_id != event_id:
+			remaining.append(item)
+	_queue = remaining
+	_queue_head = 0
 
 
 func subscription_count(event_id: StringName = &"") -> int:
@@ -99,7 +117,20 @@ func subscription_count(event_id: StringName = &"") -> int:
 
 
 func queued_count() -> int:
-	return _queue.size()
+	return _queue.size() - _queue_head
+
+
+func queue_capacity() -> int:
+	return _max_queued_events
+
+
+func _compact_queue() -> void:
+	if _queue_head == _queue.size():
+		_queue.clear()
+		_queue_head = 0
+	elif _queue_head >= 1024 and _queue_head * 2 >= _queue.size():
+		_queue = _queue.slice(_queue_head)
+		_queue_head = 0
 
 
 func _is_before(left_token: int, right_token: int) -> bool:

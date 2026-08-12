@@ -1,3 +1,4 @@
+@tool
 class_name GFDownloadSettings
 extends Resource
 
@@ -17,6 +18,13 @@ func validate() -> String:
 		return "Download root name cannot be empty."
 	if not _is_safe_user_directory(base_directory):
 		return "Download base directory must be a non-root path inside user://."
+	if max_concurrent < 1 or retry_count < 0:
+		return "Download concurrency must be positive and retry count cannot be negative."
+	if timeout_seconds < 0.0 or max_redirects < 0 or body_size_limit_bytes < -1:
+		return "Download timeout, redirect, or body-size policy is invalid."
+	for status_code: int in retry_http_status_codes:
+		if status_code < 100 or status_code > 599:
+			return "Download retry status code %d is outside the HTTP range." % status_code
 	return ""
 
 

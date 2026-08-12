@@ -33,9 +33,12 @@ func boot(override_config: GFFrameworkConfig = null) -> Error:
 	config = override_config if override_config != null else _load_config()
 	if config == null:
 		return _boot_failure(ERR_FILE_CANT_READ, "Framework configuration could not be loaded.")
+	var config_error := config.validate()
+	if not config_error.is_empty():
+		return _boot_failure(ERR_INVALID_DATA, config_error)
 
 	services = GFServiceContainer.new()
-	events = GFEventBus.new()
+	events = GFEventBus.new(config.max_queued_events)
 	messages = GFMessageBus.new()
 	logger = GFLogger.new()
 	logger.minimum_level = config.minimum_log_level

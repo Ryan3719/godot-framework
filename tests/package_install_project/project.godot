@@ -1,0 +1,16 @@
+config_version=5
+
+[application]
+
+config/name="Godot Framework Package Install Test"
+run/main_scene="res://package_install_runner.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_framework/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

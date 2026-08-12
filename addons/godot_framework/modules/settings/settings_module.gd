@@ -9,7 +9,16 @@ func module_id() -> StringName:
 	return &"settings"
 
 
+func validate_configuration() -> String:
+	if settings != null and not settings is GFSettingsSettings:
+		return "Settings module settings must use GFSettingsSettings."
+	var candidate := settings as GFSettingsSettings if settings != null else GFSettingsSettings.new()
+	return candidate.validate()
+
+
 func initialize() -> Error:
+	if not validate_configuration().is_empty():
+		return ERR_INVALID_DATA
 	module_settings = settings as GFSettingsSettings
 	if module_settings == null:
 		module_settings = GFSettingsSettings.new()
