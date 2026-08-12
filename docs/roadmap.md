@@ -28,12 +28,17 @@ Exit criteria: modules can be removed independently and do not ship branded scre
 
 ## 0.3 Content Delivery
 
-- Resource ownership handles and cache policies
-- PCK manifest, download, integrity/signature verification, mount, rollback, and recovery
-- HTTP download queue with retry, throttling, cancellation, and resumability where supported
-- Configuration-table adapter interfaces; Luban integration remains an optional external package
+Status: implemented for Godot 4.4-compatible desktop behavior in the current development branch. Exported mobile validation and bandwidth/resume policy remain release-hardening work.
 
-Exit criteria: exported desktop/mobile validation and an explicit threat model. Resource hot update is not declared supported before this milestone exits.
+- Resource ownership handles with transient, leased, and retained cache policies
+- HTTP download queue with bounded concurrency, progress, retry, cancellation, safe relative targets, and transactional replacement
+- Optional size and SHA-256 download verification
+- Detached RSA-SHA256 PCK manifests, installation records, active/previous release state, ordered startup mount, and persistent rollback
+- Fail-closed corrupt-state handling and an explicit restart boundary because Godot cannot unload mounted PCKs
+- Configuration-table provider interface and registry; Luban remains an optional external adapter
+- Mocked failure-path tests plus a real PCK creation/mount/read integration test
+
+Exit criteria for a stable release: exported desktop/mobile validation, CDN integration tests, and a defined resumable Range-request policy. The current development API does not claim bandwidth throttling, resumable downloads, same-process PCK unload, or arbitrary script hot reload.
 
 ## 0.4 Connectivity
 

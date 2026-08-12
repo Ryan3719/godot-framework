@@ -9,6 +9,8 @@ signal load_failed(path: String, error: Error)
 var cache_enabled := true
 var _cache: Dictionary = {}
 var _requests: Dictionary = {}
+var _lease_counts: Dictionary = {}
+var _retained: Dictionary = {}
 
 
 func load(path: String, type_hint := "", cache_mode := ResourceLoader.CACHE_MODE_REUSE) -> Resource:
@@ -19,7 +21,33 @@ func load(path: String, type_hint := "", cache_mode := ResourceLoader.CACHE_MODE
 	var resource := ResourceLoader.load(path, type_hint, cache_mode)
 	if resource != null and cache_enabled:
 		_cache[path] = resource
+		_retained[path] = true
 	return resource
+
+
+func acquire(
+	path: String,
+	type_hint := "",
+	policy := GFResourceHandle.CachePolicy.LEASED,
+	cache_mode := ResourceLoader.CACHE_MODE_REUSE,
+) -> GFResourceHandle:
+	if path.is_empty() or policy not in GFResourceHandle.CachePolicy.values():
+		return null
+	var resource := _cache.get(path) as Resource
+	if resource == null:
+		resource = ResourceLoader.load(path, type_hint, cache_mode)
+	if resource == null:
+		return null
+	match policy:
+		GFResourceHandle.CachePolicy.LEASED:
+			_cache[path] = resource
+			_lease_counts[path] = int(_lease_counts.get(path, 0)) + 1
+		GFResourceHandle.CachePolicy.RETAINED:
+			_cache[path] = resource
+			_retained[path] = true
+		GFResourceHandle.CachePolicy.TRANSIENT:
+			pass
+	return GFResourceHandle.new(self, path, resource, policy)
 
 
 func request(path: String, type_hint := "", use_sub_threads := false) -> Error:
@@ -61,6 +89,7 @@ func poll(max_requests := 8) -> int:
 				if resource != null:
 					if cache_enabled:
 						_cache[path] = resource
+						_retained[path] = true
 					load_progress.emit(path, 1.0)
 					load_completed.emit(path, resource)
 				else:
@@ -83,11 +112,21 @@ func has_cached(path: String) -> bool:
 
 
 func release(path: String) -> bool:
+	if lease_count(path) > 0:
+		return false
+	_retained.erase(path)
 	return _cache.erase(path)
 
 
-func clear_cache() -> void:
-	_cache.clear()
+func clear_cache(force := false) -> void:
+	if force:
+		_cache.clear()
+		_retained.clear()
+		return
+	for path: String in _cache.keys():
+		if lease_count(path) == 0:
+			_cache.erase(path)
+			_retained.erase(path)
 
 
 func clear(wait_for_pending := true) -> void:
@@ -95,8 +134,29 @@ func clear(wait_for_pending := true) -> void:
 		for path: String in _requests.keys():
 			ResourceLoader.load_threaded_get(path)
 	_requests.clear()
-	_cache.clear()
+	clear_cache(true)
+	_lease_counts.clear()
 
 
 func pending_count() -> int:
 	return _requests.size()
+
+
+func lease_count(path: String) -> int:
+	return int(_lease_counts.get(path, 0))
+
+
+func is_retained(path: String) -> bool:
+	return _retained.has(path)
+
+
+func _release_handle(path: String, policy: GFResourceHandle.CachePolicy) -> void:
+	if policy != GFResourceHandle.CachePolicy.LEASED:
+		return
+	var remaining := lease_count(path) - 1
+	if remaining > 0:
+		_lease_counts[path] = remaining
+		return
+	_lease_counts.erase(path)
+	if not _retained.has(path):
+		_cache.erase(path)

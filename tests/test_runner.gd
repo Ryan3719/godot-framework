@@ -20,6 +20,9 @@ func _ready() -> void:
 	_test_input_service()
 	_test_localization_service()
 	await _test_resource_service()
+	await _test_download_service()
+	_test_content_service()
+	_test_table_service()
 	_test_settings_service()
 	_test_storage_service_and_migration()
 	_finish()
@@ -45,6 +48,9 @@ func _test_default_framework_boot() -> void:
 	_expect(framework.get_service(GFServiceIds.UI) == null, "Optional UI module is disabled by default")
 	_expect(framework.get_service(GFServiceIds.AUDIO) == null, "Optional audio module is disabled by default")
 	_expect(framework.get_service(GFServiceIds.INPUT) == null, "Optional input module is disabled by default")
+	_expect(framework.get_service(GFServiceIds.DOWNLOADS) == null, "Optional download module is disabled by default")
+	_expect(framework.get_service(GFServiceIds.CONTENT) == null, "Optional content module is disabled by default")
+	_expect(framework.get_service(GFServiceIds.TABLES) == null, "Optional table module is disabled by default")
 	_expect(
 		framework.get_service(GFServiceIds.LOCALIZATION) == null,
 		"Optional localization module is disabled by default",
@@ -191,11 +197,25 @@ func _test_optional_module_lifecycle() -> void:
 	localization_settings.fallback_locale = "en"
 	localization_settings.use_system_locale = false
 	localization_module.configure(localization_settings)
+	var download_module := GFDownloadModule.new()
+	var download_settings := GFDownloadSettings.new()
+	download_settings.base_directory = "user://gf_integrated_downloads"
+	download_module.configure(download_settings)
+	var content_module := GFContentModule.new()
+	var content_settings := GFContentSettings.new()
+	content_settings.base_directory = "user://gf_integrated_content"
+	content_settings.require_signature = false
+	content_settings.auto_mount_active = false
+	content_module.configure(content_settings)
+	var table_module := GFTableModule.new()
 
 	_expect(manager.install(ui_module) == OK, "Optional UI module can be installed before its dependency")
 	_expect(manager.install(audio_module) == OK, "Optional audio module can be installed")
 	_expect(manager.install(input_module) == OK, "Optional input module can be installed")
 	_expect(manager.install(localization_module) == OK, "Optional localization module can be installed")
+	_expect(manager.install(download_module) == OK, "Optional download module can be installed")
+	_expect(manager.install(content_module) == OK, "Optional content module can be installed")
+	_expect(manager.install(table_module) == OK, "Optional table module can be installed")
 	_expect(manager.install(resource_module) == OK, "Resource module can coexist with optional modules")
 	_expect(manager.initialize_all() == OK and manager.start_all() == OK, "Optional modules start through module manager")
 	_expect(
@@ -209,6 +229,9 @@ func _test_optional_module_lifecycle() -> void:
 		services.resolve(GFServiceIds.LOCALIZATION) is GFLocalizationService,
 		"Localization module registers its service",
 	)
+	_expect(services.resolve(GFServiceIds.DOWNLOADS) is GFDownloadService, "Download module registers its service")
+	_expect(services.resolve(GFServiceIds.CONTENT) is GFContentService, "Content module registers its service")
+	_expect(services.resolve(GFServiceIds.TABLES) is GFTableService, "Table module registers its service")
 	manager.shutdown_all()
 	_expect(not services.has(GFServiceIds.UI), "UI module removes its service during shutdown")
 	_expect(not services.has(GFServiceIds.AUDIO), "Audio module removes its service during shutdown")
@@ -217,6 +240,9 @@ func _test_optional_module_lifecycle() -> void:
 		not services.has(GFServiceIds.LOCALIZATION),
 		"Localization module removes its service during shutdown",
 	)
+	_expect(not services.has(GFServiceIds.DOWNLOADS), "Download module removes its service during shutdown")
+	_expect(not services.has(GFServiceIds.CONTENT), "Content module removes its service during shutdown")
+	_expect(not services.has(GFServiceIds.TABLES), "Table module removes its service during shutdown")
 
 	var existing_input_service := RefCounted.new()
 	var failure_services := GFServiceContainer.new()
@@ -468,10 +494,50 @@ func _test_localization_service() -> void:
 
 func _test_resource_service() -> void:
 	var resources := GFResourceService.new()
-	var loaded := resources.load("res://addons/godot_framework/config/default_framework_config.tres")
+	var config_path := "res://addons/godot_framework/config/default_framework_config.tres"
+	var loaded := resources.load(config_path)
 	_expect(loaded is GFFrameworkConfig, "Resource service loads typed Godot resources")
 	_expect(is_same(loaded, resources.get_cached(loaded.resource_path)), "Resource service caches loaded resource")
 	_expect(resources.release(loaded.resource_path), "Resource cache entry can be released")
+	var legacy_cached := resources.load(config_path)
+	var lease_over_legacy := resources.acquire(config_path)
+	lease_over_legacy.release()
+	_expect(
+		legacy_cached != null and resources.has_cached(config_path),
+		"Leased handle does not evict a cache entry retained by legacy load",
+	)
+	resources.release(config_path)
+
+	var first_lease := resources.acquire(config_path)
+	var second_lease := resources.acquire(config_path)
+	_expect(
+		first_lease != null and second_lease != null and is_same(first_lease.resource, second_lease.resource),
+		"Leased resource handles share a framework cache entry",
+	)
+	_expect(resources.lease_count(config_path) == 2, "Resource service counts active leases")
+	_expect(not resources.release(config_path), "Manual cache release cannot evict an active lease")
+	first_lease.release()
+	_expect(
+		resources.lease_count(config_path) == 1 and resources.has_cached(config_path),
+		"Releasing one resource handle preserves other leases",
+	)
+	second_lease.release()
+	_expect(not resources.has_cached(config_path), "Last leased handle evicts an unretained resource")
+	second_lease.release()
+	_expect(
+		resources.lease_count(config_path) == 0 and not resources.has_cached(config_path),
+		"Repeated resource handle release is harmless",
+	)
+
+	var retained := resources.acquire(config_path, "", GFResourceHandle.CachePolicy.RETAINED)
+	_expect(retained != null and resources.is_retained(config_path), "Retained handle marks its cache entry")
+	retained.release()
+	_expect(resources.has_cached(config_path), "Releasing retained handle keeps its cache entry")
+	_expect(resources.release(config_path), "Retained cache entry can be explicitly released")
+	var transient := resources.acquire(config_path, "", GFResourceHandle.CachePolicy.TRANSIENT)
+	_expect(transient != null and not resources.has_cached(config_path), "Transient handle bypasses framework cache")
+	transient.release()
+	_expect(transient.is_released() and transient.resource == null, "Released resource handle drops resource ownership")
 	var async_completed := [false]
 	resources.load_completed.connect(func(path: String, _resource: Resource) -> void:
 		if path == "res://tests/fixtures/transition_target.tscn":
@@ -488,6 +554,257 @@ func _test_resource_service() -> void:
 		await get_tree().process_frame
 	_expect(async_completed[0], "Threaded resource request completes")
 	_expect(resources.get_cached("res://tests/fixtures/transition_target.tscn") is PackedScene, "Threaded resource is cached")
+
+
+func _test_download_service() -> void:
+	var base_directory := "user://gf_framework_download_tests"
+	var settings := GFDownloadSettings.new()
+	settings.base_directory = base_directory
+	settings.max_concurrent = 2
+	settings.retry_count = 1
+	var unsafe_download_settings := GFDownloadSettings.new()
+	unsafe_download_settings.base_directory = "user://../outside"
+	_expect(not unsafe_download_settings.validate().is_empty(), "Download settings reject user directory escape")
+	var payload := "download payload".to_utf8_buffer()
+	var hasher := HashingContext.new()
+	hasher.start(HashingContext.HASH_SHA256)
+	hasher.update(payload)
+	var payload_hash := hasher.finish().hex_encode()
+	var plans: Array[Dictionary] = [
+		{"response_code": 500, "data": "retry".to_utf8_buffer()},
+		{"response_code": 200, "data": "second".to_utf8_buffer()},
+		{"response_code": 200, "data": payload},
+		{"response_code": 200, "data": "bad hash".to_utf8_buffer()},
+		{
+			"response_code": 200,
+			"data": "cancelled".to_utf8_buffer(),
+			"auto_complete": false,
+			"write_on_start": true,
+		},
+	]
+	var downloads := GFDownloadService.new(
+		self,
+		settings,
+		func(): return GFTestDownloadBackend.new().setup(plans.pop_front()),
+	)
+	_expect(downloads.enqueue("file:///unsafe", "bad.bin") == 0, "Download queue rejects non-HTTP URLs")
+	_expect(downloads.enqueue("https://example.test/file", "../bad.bin") == 0, "Download queue rejects traversal paths")
+	_expect(downloads.enqueue("https://example.test/file", "C:/bad.bin") == 0, "Download queue rejects drive-qualified paths")
+	_expect(downloads.enqueue("https://example.test/file", "bad.bin", "xyz") == 0, "Download queue rejects malformed hashes")
+
+	var first_id := downloads.enqueue(
+		"https://example.test/first",
+		"content/first.bin",
+		payload_hash,
+		payload.size(),
+	)
+	var second_id := downloads.enqueue("https://example.test/second", "content/second.bin")
+	_expect(
+		downloads.enqueue("https://example.test/duplicate", "content/first.bin") == 0,
+		"Download queue rejects concurrent ownership of one target",
+	)
+	downloads.update()
+	_expect(downloads.active_count() == 2, "Download queue enforces configured parallel dispatch")
+	await get_tree().process_frame
+	downloads.update()
+	await get_tree().process_frame
+	downloads.update()
+	_expect(downloads.task_state(first_id) == GFDownloadService.TaskState.COMPLETED, "Retryable HTTP failure is retried")
+	_expect(int(downloads.task_info(first_id).attempts) == 2, "Download task records retry attempts")
+	_expect(downloads.task_state(second_id) == GFDownloadService.TaskState.COMPLETED, "Parallel download completes")
+	_expect(
+		FileAccess.get_file_as_bytes(base_directory.path_join("content/first.bin")) == payload,
+		"Validated download is committed to its target",
+	)
+
+	settings.retry_count = 0
+	var bad_target := base_directory.path_join("content/bad.bin")
+	var existing := FileAccess.open(bad_target, FileAccess.WRITE)
+	existing.store_string("existing")
+	existing.flush()
+	existing = null
+	var bad_id := downloads.enqueue(
+		"https://example.test/bad",
+		"content/bad.bin",
+		payload_hash,
+	)
+	downloads.update()
+	await get_tree().process_frame
+	downloads.update()
+	_expect(downloads.task_state(bad_id) == GFDownloadService.TaskState.FAILED, "Checksum mismatch fails download")
+	_expect(FileAccess.get_file_as_string(bad_target) == "existing", "Failed download preserves existing target")
+
+	var cancelled_id := downloads.enqueue("https://example.test/cancel", "content/cancel.bin")
+	downloads.update()
+	_expect(downloads.task_state(cancelled_id) == GFDownloadService.TaskState.RUNNING, "Download can enter running state")
+	_expect(FileAccess.file_exists(str(downloads.task_info(cancelled_id).temp_path)), "Running download may own a partial file")
+	_expect(downloads.cancel(cancelled_id), "Running download can be cancelled")
+	_expect(downloads.task_state(cancelled_id) == GFDownloadService.TaskState.CANCELLED, "Cancelled download reaches terminal state")
+	_expect(not FileAccess.file_exists(base_directory.path_join("content/cancel.bin")), "Cancelled download removes partial file")
+	_expect(downloads.clear_finished() == 4, "Finished download history can be cleared")
+	downloads.shutdown()
+	await get_tree().process_frame
+	DirAccess.remove_absolute(base_directory.path_join("content/first.bin"))
+	DirAccess.remove_absolute(base_directory.path_join("content/second.bin"))
+	DirAccess.remove_absolute(bad_target)
+	DirAccess.remove_absolute(base_directory.path_join("content"))
+	DirAccess.remove_absolute(base_directory)
+
+
+func _test_content_service() -> void:
+	var base_directory := "user://gf_framework_content_tests"
+	var crypto := Crypto.new()
+	var private_key := crypto.generate_rsa(2048)
+	_expect(private_key != null, "Content test can generate an RSA key")
+	var settings := GFContentSettings.new()
+	settings.base_directory = base_directory
+	settings.public_key_pem = private_key.save_to_string(true)
+	settings.require_signature = true
+	settings.auto_mount_active = false
+	var unsafe_content_settings := GFContentSettings.new()
+	unsafe_content_settings.base_directory = "user://../outside"
+	unsafe_content_settings.require_signature = false
+	_expect(not unsafe_content_settings.validate().is_empty(), "Content settings reject user directory escape")
+
+	var first_data := "first pack".to_utf8_buffer()
+	var first_path := base_directory.path_join("releases/v1/base.pck")
+	_expect(_write_test_file(first_path, first_data) == OK, "Content test pack can be staged")
+	var first_manifest := JSON.stringify({
+		"schema_version": 1,
+		"release_id": "v1",
+		"packs": [{
+			"id": "base",
+			"path": "base.pck",
+			"sha256": _sha256_bytes(first_data),
+			"size": first_data.size(),
+			"replace_files": true,
+		}],
+	})
+	var first_signature := crypto.sign(HashingContext.HASH_SHA256, first_manifest.sha256_buffer(), private_key)
+	var mounted_paths: Array[String] = []
+	var content := GFContentService.new(
+		settings,
+		func(path: String, _replace: bool, _offset: int) -> bool:
+			mounted_paths.append(path)
+			return true,
+	)
+	_expect(content.initialization_error() == OK, "Content service loads configured public key")
+	_expect(content.release_directory("v1").ends_with("/releases/v1"), "Content service exposes a safe release staging directory")
+	_expect(content.pack_path("v1", "../bad.pck").is_empty(), "Content service rejects unsafe staged pack path")
+	_expect(
+		content.install_release(first_manifest, PackedByteArray([1, 2, 3])) == ERR_UNAUTHORIZED,
+		"Content installation rejects an invalid detached signature",
+	)
+	_expect(content.install_release(first_manifest, first_signature) == OK, "Signed content release can be installed")
+	_expect(content.validate_release("v1") == OK, "Installed content release can be revalidated")
+	_expect(content.activate_release("v1") == OK, "Installed content release can be activated")
+	_expect(content.mount_active() == OK and content.mounted_release == "v1", "Active content release mounts all packs")
+	_expect(mounted_paths == [first_path], "Content mount uses the validated release path")
+
+	var second_a := "second a".to_utf8_buffer()
+	var second_b := "second b".to_utf8_buffer()
+	var second_a_path := base_directory.path_join("releases/v2/a.pck")
+	var second_b_path := base_directory.path_join("releases/v2/b.pck")
+	_write_test_file(second_a_path, second_a)
+	_write_test_file(second_b_path, second_b)
+	var second_manifest := JSON.stringify({
+		"schema_version": 1,
+		"release_id": "v2",
+		"packs": [
+			{
+				"id": "a",
+				"path": "a.pck",
+				"sha256": _sha256_bytes(second_a),
+				"size": second_a.size(),
+			},
+			{
+				"id": "b",
+				"path": "b.pck",
+				"sha256": _sha256_bytes(second_b),
+				"size": second_b.size(),
+			},
+		],
+	})
+	var second_signature := crypto.sign(HashingContext.HASH_SHA256, second_manifest.sha256_buffer(), private_key)
+	_expect(content.install_release(second_manifest, second_signature) == OK, "Second signed content release can be installed")
+	_expect(content.activate_release("v2") == OK and content.restart_required, "Switching mounted content schedules a restart")
+
+	var mount_attempts := [0]
+	var failing_content := GFContentService.new(
+		settings,
+		func(_path: String, _replace: bool, _offset: int) -> bool:
+			mount_attempts[0] += 1
+			return mount_attempts[0] == 1,
+	)
+	_expect(failing_content.mount_active() == ERR_CANT_OPEN, "Partial content mount failure is reported")
+	_expect(failing_content.restart_required, "Partial content mount failure requires process restart")
+	_expect(
+		failing_content.mount_active() == ERR_ALREADY_IN_USE,
+		"Partial content mount locks further mounts in the current process",
+	)
+	_expect(
+		failing_content.activation_state().active == "v1"
+		and failing_content.activation_state().previous == "v2",
+		"Failed activation restores previous release for next startup",
+	)
+	_expect(failing_content.rollback() == OK, "Content activation can roll back to previous release")
+	_expect(failing_content.activation_state().active == "v2", "Explicit rollback swaps active and previous releases")
+
+	var unsafe_manifest := JSON.stringify({
+		"schema_version": 1,
+		"release_id": "unsafe",
+		"packs": [{
+			"id": "bad",
+			"path": "../bad.pck",
+			"sha256": _sha256_bytes(first_data),
+			"size": first_data.size(),
+		}],
+	})
+	var unsafe_signature := crypto.sign(HashingContext.HASH_SHA256, unsafe_manifest.sha256_buffer(), private_key)
+	_expect(
+		content.install_release(unsafe_manifest, unsafe_signature) == ERR_INVALID_DATA,
+		"Content manifest rejects traversal paths",
+	)
+	var corrupt_state := FileAccess.open(base_directory.path_join("activation.json"), FileAccess.WRITE)
+	corrupt_state.store_string("not json")
+	corrupt_state.flush()
+	corrupt_state = null
+	var corrupt_content := GFContentService.new(settings, func(_path: String, _replace: bool, _offset: int) -> bool: return true)
+	_expect(corrupt_content.mount_active() == ERR_INVALID_DATA, "Corrupt activation state fails closed")
+	content.shutdown()
+	failing_content.shutdown()
+	corrupt_content.shutdown()
+
+	DirAccess.remove_absolute(base_directory.path_join("activation.json"))
+	DirAccess.remove_absolute(base_directory.path_join("releases/v1/release.json"))
+	DirAccess.remove_absolute(first_path)
+	DirAccess.remove_absolute(base_directory.path_join("releases/v1"))
+	DirAccess.remove_absolute(base_directory.path_join("releases/v2/release.json"))
+	DirAccess.remove_absolute(second_a_path)
+	DirAccess.remove_absolute(second_b_path)
+	DirAccess.remove_absolute(base_directory.path_join("releases/v2"))
+	DirAccess.remove_absolute(base_directory.path_join("releases"))
+	DirAccess.remove_absolute(base_directory)
+
+
+func _test_table_service() -> void:
+	var tables := GFTableService.new()
+	var provider := GFMemoryTestTableProvider.new()
+	_expect(tables.register_provider(&"memory", provider) == OK, "Table provider can be registered")
+	_expect(tables.register_provider(&"memory", provider) == ERR_ALREADY_EXISTS, "Duplicate table provider is rejected")
+	_expect(
+		tables.load_table(&"memory", &"items", {1: {"name": "Potion"}, 2: {"name": "Sword"}}) == OK,
+		"Table service delegates loading to its provider",
+	)
+	_expect(tables.has_table(&"memory", &"items"), "Table service reports loaded provider table")
+	_expect(tables.get_row(&"memory", &"items", 1).name == "Potion", "Table service delegates keyed row lookup")
+	_expect(tables.get_row(&"memory", &"items", 9, "missing") == "missing", "Table lookup preserves caller default")
+	_expect(tables.get_all(&"memory", &"items").size() == 2, "Table service delegates full table reads")
+	_expect(tables.unload_table(&"memory", &"items") and not tables.has_table(&"memory", &"items"), "Table service delegates unload")
+	_expect(tables.load_table(&"missing", &"items", {}) == ERR_DOES_NOT_EXIST, "Unknown table provider fails explicitly")
+	_expect(not tables.unregister_provider(&"memory", GFMemoryTestTableProvider.new()), "Table provider unregister checks owner identity")
+	_expect(tables.unregister_provider(&"memory", provider) and provider.cleared, "Owned table provider is cleared on removal")
+	tables.shutdown()
 
 
 func _test_settings_service() -> void:
@@ -568,6 +885,25 @@ func _new_module_manager(service_container: GFServiceContainer = null) -> GFModu
 	logger.minimum_level = GFLogger.Level.NONE
 	var context := GFContext.new(self, services, events, messages, logger)
 	return GFModuleManager.new(context)
+
+
+func _write_test_file(path: String, data: PackedByteArray) -> Error:
+	var directory_result := DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	if directory_result != OK:
+		return directory_result
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	file.store_buffer(data)
+	file.flush()
+	return OK
+
+
+func _sha256_bytes(data: PackedByteArray) -> String:
+	var hasher := HashingContext.new()
+	hasher.start(HashingContext.HASH_SHA256)
+	hasher.update(data)
+	return hasher.finish().hex_encode()
 
 
 func _expect(condition: bool, description: String) -> void:

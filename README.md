@@ -2,7 +2,7 @@
 
 A modular, business-agnostic game framework for Godot 4.4+.
 
-> Status: `0.2.0-dev`. The foundation and optional presentation modules are usable and tested, but public APIs may change before the first stable release.
+> Status: `0.3.0-dev`. Foundation, presentation, and content-delivery modules are usable and tested, but public APIs may change before the first stable release.
 
 Godot Framework provides reusable infrastructure without prescribing a game genre, screen flow, data model, or application architecture. It uses Godot's scene tree, signals, Resources, and loaders directly instead of recreating Unity's runtime model.
 
@@ -23,6 +23,10 @@ Godot Framework provides reusable infrastructure without prescribing a game genr
 - Grouped audio playback with handles, concurrency limits, and runtime controls
 - Input remapping profiles scoped to an explicit action allowlist
 - Locale selection, owned translations, formatting, and translation-key validation
+- Resource ownership handles with transient, leased, and retained cache policies
+- Transactional HTTP download queue with concurrency, retry, cancellation, size, and SHA-256 validation
+- Signed PCK release manifests with staged installation, startup activation, and persistent rollback
+- Provider-neutral configuration-table registry
 
 Every feature except the small runtime kernel is optional through `GFFrameworkConfig`.
 
@@ -38,7 +42,7 @@ res://addons/godot_framework/config/default_framework_config.tres
 
 Move the duplicate outside `addons/`, then set `godot_framework/config_path` in Project Settings to that resource. Keeping project-owned configuration outside the addon prevents updates from overwriting it.
 
-UI, audio, input, and localization definitions are included but disabled in the addon default. Enable only the modules a project uses, then assign project-owned settings resources. This keeps a fresh installation from creating render or audio nodes, managing input actions, or changing the active locale.
+UI, audio, input, localization, download, content, and table definitions are included but disabled in the addon default. Enable only the modules a project uses, then assign project-owned settings resources. This keeps a fresh installation from creating render, audio, or network nodes, managing input actions, changing locale, or mounting external content.
 
 ## Use
 
@@ -83,7 +87,7 @@ godot --headless --editor --quit --path .
 godot --headless --verbose --path .
 ```
 
-The test project currently runs 174 assertions plus an end-to-end scene transition test, and exits non-zero on failure. CI treats parse errors, engine errors, leaked objects, and resources left in use as failures.
+The test project currently runs 250 assertions plus end-to-end scene-transition and real PCK-mount tests, and exits non-zero on failure. CI treats parse errors, engine errors, leaked objects, and resources left in use as failures.
 
 ## Documentation
 
@@ -91,6 +95,7 @@ The test project currently runs 174 assertions plus an end-to-end scene transiti
 - [Research and design decisions](docs/research.md)
 - [Extending the framework](docs/extending.md)
 - [Roadmap](docs/roadmap.md)
+- [Content delivery](docs/content_delivery.md)
 
 ## License
 

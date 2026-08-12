@@ -14,7 +14,7 @@ Application / game
                          |
 Optional framework modules
   Resource, scene, storage, settings, pool, state machine,
-  UI, audio, input, localization
+  UI, audio, input, localization, download, content, tables
                          |
 Stable framework kernel
   Host, module lifecycle, services, events, messages, logging
@@ -58,7 +58,7 @@ Framework and module configuration uses typed Godot `Resource` objects. The addo
 
 Resources hold authorable configuration. Runtime save data is restricted to object-free Variants and never serializes `Node`, `Resource`, texture, audio, or arbitrary script objects.
 
-The addon default enables the foundation modules and keeps UI, audio, input, and localization disabled. Enabling those modules is an explicit project decision:
+The addon default enables the foundation modules and keeps UI, audio, input, localization, download, content, and tables disabled. Enabling those modules is an explicit project decision:
 
 - UI owns a node root and configured `CanvasLayer` instances. Routes point to project-owned scenes whose roots extend `GFUIView`; the framework owns navigation lifecycle, not screen content.
 - Audio owns its players beneath one node root. Project configuration defines logical groups and buses, while playback handles and group volume are runtime state.
@@ -66,6 +66,18 @@ The addon default enables the foundation modules and keeps UI, audio, input, and
 - Localization selects only configured locales, owns only translations added through its service, and restores the previous global locale when its module shuts down.
 
 Each presentation module can be removed independently. In particular, UI uses Godot `PackedScene` directly and has no artificial dependency on the resource module.
+
+## Content Delivery
+
+Resource handles make ownership explicit without replacing Godot's loader. A transient handle does not enter the framework cache, a leased handle keeps one shared cache entry until its last owner releases it, and a retained handle remains cached until explicit eviction. Every owner must call `GFResourceHandle.release()`; finalization is deliberately not an ownership boundary because deterministic cleanup must not depend on engine destruction order. Module shutdown still clears all framework cache state. Legacy `load()` calls retain their cache entries for backward compatibility.
+
+The download module owns queue policy and file transactions while `GFHTTPDownloadBackend` delegates transport to Godot `HTTPRequest`. Each task streams into a unique `.part` file under a configured `user://` directory, validates optional length and SHA-256, then replaces its target through a backup. Cancellation and failed validation remove the partial file without overwriting a previous target.
+
+The content module accepts detached RSA-SHA256 signatures over the exact manifest UTF-8 bytes. It validates every declared PCK path, length, and hash before writing an installation record. Activation changes a small persistent `active`/`previous` pointer; startup mounts the active release in manifest order.
+
+Godot 4.4 exposes `ProjectSettings.load_resource_pack()` but no matching unload API. Consequently, a partially mounted release cannot be removed from the current process. The module restores the previous activation pointer for the next startup, locks further mounts, and exposes `restart_required`. It never claims same-process PCK rollback.
+
+The table module is only a provider registry. It does not impose JSON, CSV, Luban, SQLite, row ID, or generated-code conventions on applications.
 
 ## Storage Safety
 
@@ -87,3 +99,5 @@ This is a recoverable local persistence mechanism, not an encrypted or tamper-re
 ## Headless Boundaries
 
 `GFAudioService` normally calls `AudioStreamPlayer.play()` and `stop()`. Its constructor also accepts playback callables so deterministic headless tests can exercise ownership and concurrency without creating a live `AudioServer` playback. This is a test boundary, not a second production audio backend.
+
+Download tests inject `GFDownloadBackend` instances to simulate status codes and partial files deterministically. Content tests inject a mount callable for failure/rollback paths, while a separate process creates and mounts a real PCK through Godot's engine API.

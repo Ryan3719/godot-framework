@@ -27,17 +27,24 @@ jobs:
         run: |
           set -o pipefail
           godot --headless --editor --quit --path . 2>&1 | tee godot-import.log
-          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:" godot-import.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-import.log
 
       - name: Run tests
         run: |
           set -o pipefail
           godot --headless --verbose --path . 2>&1 | tee godot-test.log
-          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|instances were leaked|resources still in use" godot-test.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-test.log
 
       - name: Run scene transition test
         run: |
           set -o pipefail
           godot --headless --verbose --path . tests/scene_transition_runner.tscn 2>&1 | tee godot-scene-test.log
           grep -F "[TEST] PASS: scene transition completed" godot-scene-test.log
-          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|instances were leaked|resources still in use" godot-scene-test.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-scene-test.log
+
+      - name: Run content pack mount test
+        run: |
+          set -o pipefail
+          godot --headless --verbose --path . tests/content_pack_runner.tscn 2>&1 | tee godot-content-test.log
+          grep -F "[TEST] PASS: content pack mounted" godot-content-test.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-content-test.log

@@ -48,9 +48,13 @@ extends Resource
 
 Create a `GFModuleDefinition`, assign the module script and settings resource, and append it to the project's `GFFrameworkConfig`.
 
-The default configuration already contains disabled definitions for UI, audio, input, and localization. Duplicate the framework and relevant settings resources outside `addons/`, then enable the definitions in the project copy. Do not edit addon defaults because an upgrade can replace them.
+The default configuration already contains disabled definitions for UI, audio, input, localization, download, content, and tables. Duplicate the framework and relevant settings resources outside `addons/`, then enable the definitions in the project copy. Do not edit addon defaults because an upgrade can replace them.
 
 For UI, keep layers and route metadata in `GFUISettings`, and keep concrete scenes and application behavior in the project. For input, list only actions the framework may rebind. For localization, configure the supported locale allowlist and fallback explicitly. Audio groups must reference buses that exist in the project.
+
+For downloadable content, use `GFContentService.release_directory()` and `pack_path()` to derive safe staging targets, feed those paths to `GFDownloadService`, then call `install_release()` only after all task completions. Embed only the public verification key in the client; the private signing key belongs in an offline release pipeline.
+
+Configuration-table integrations extend `GFTableProvider`. A provider owns parsing, generated types, indexing, and source format. The framework registry owns provider lifetime and routing only, so Luban support can ship as a separate adapter without making it a mandatory dependency.
 
 ## Service Ownership
 
