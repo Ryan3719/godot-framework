@@ -48,3 +48,23 @@ jobs:
           godot --headless --verbose --path . tests/content_pack_runner.tscn 2>&1 | tee godot-content-test.log
           grep -F "[TEST] PASS: content pack mounted" godot-content-test.log
           ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-content-test.log
+
+      - name: Run connectivity adapter test
+        run: |
+          set -euo pipefail
+          ready_file=$(mktemp)
+          rm "$ready_file"
+          python3 tests/connectivity_test_server.py --ready-file "$ready_file" > connectivity-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for index in $(seq 1 100); do
+            if [ -s "$ready_file" ]; then break; fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then cat connectivity-server.log; exit 1; fi
+            sleep 0.05
+          done
+          test -s "$ready_file"
+          http_url=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["http_url"])' "$ready_file")
+          websocket_url=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["websocket_url"])' "$ready_file")
+          godot --headless --verbose --path . tests/connectivity_integration_runner.tscn -- --http-url="$http_url" --websocket-url="$websocket_url" 2>&1 | tee godot-connectivity-test.log
+          grep -F "[CONNECTIVITY TEST] PASS: real HTTP and WebSocket adapters" godot-connectivity-test.log
+          ! grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" godot-connectivity-test.log

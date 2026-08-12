@@ -42,12 +42,17 @@ Exit criteria for a stable release: exported desktop/mobile validation, CDN inte
 
 ## 0.4 Connectivity
 
-- Transport interface and connection lifecycle
-- HTTP/WebSocket adapters first; ENet adapter based on demonstrated multiplayer use cases
-- Request correlation, timeout, cancellation, reconnect, heartbeat, and backpressure
-- Serializer and protocol adapters owned outside core
+Status: implemented for Godot 4.4-compatible desktop behavior in the current development branch. Exported Web/mobile validation and application-protocol integration remain release-hardening work.
 
-Exit criteria: transport tests with simulated loss/failure and no protocol-specific dependency in the kernel.
+- Bounded HTTP request queue with raw byte bodies, tags, cancellation, timeout, TLS options, redirects, and response size limits
+- Named WebSocket channel lifecycle with non-blocking polling, clean close, connection timeout, and bounded reconnect policy
+- Native WebSocket ping interval, receive packet budget, packet size limit, and outbound high/low watermark backpressure
+- Protocol-neutral correlation tracker with resolve, timeout, cancellation, and context ownership
+- Injectable transport backends for deterministic loss/failure tests
+- Local real-adapter integration test for HTTP raw-byte echo and WebSocket text/binary echo
+- Serializer, envelope, authentication, acknowledgement, idempotency, and domain protocol adapters remain project-owned
+
+Exit criteria for a stable release: exported desktop/Web/mobile validation, TLS integration coverage, and documented protocol-adapter examples. The current API does not claim reliable delivery, automatic WebSocket replay, browser-native ping support, ENet coverage, or one universal networking abstraction.
 
 ## 0.5 Tooling And Distribution
 

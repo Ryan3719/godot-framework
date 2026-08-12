@@ -23,6 +23,7 @@ func _ready() -> void:
 	await _test_download_service()
 	_test_content_service()
 	_test_table_service()
+	_test_connectivity_service()
 	_test_settings_service()
 	_test_storage_service_and_migration()
 	_finish()
@@ -51,6 +52,7 @@ func _test_default_framework_boot() -> void:
 	_expect(framework.get_service(GFServiceIds.DOWNLOADS) == null, "Optional download module is disabled by default")
 	_expect(framework.get_service(GFServiceIds.CONTENT) == null, "Optional content module is disabled by default")
 	_expect(framework.get_service(GFServiceIds.TABLES) == null, "Optional table module is disabled by default")
+	_expect(framework.get_service(GFServiceIds.CONNECTIVITY) == null, "Optional connectivity module is disabled by default")
 	_expect(
 		framework.get_service(GFServiceIds.LOCALIZATION) == null,
 		"Optional localization module is disabled by default",
@@ -208,6 +210,10 @@ func _test_optional_module_lifecycle() -> void:
 	content_settings.auto_mount_active = false
 	content_module.configure(content_settings)
 	var table_module := GFTableModule.new()
+	var connectivity_module := GFConnectivityModule.new()
+	var connectivity_settings := GFConnectivitySettings.new()
+	connectivity_settings.root_name = "IntegratedTestConnectivity"
+	connectivity_module.configure(connectivity_settings)
 
 	_expect(manager.install(ui_module) == OK, "Optional UI module can be installed before its dependency")
 	_expect(manager.install(audio_module) == OK, "Optional audio module can be installed")
@@ -216,6 +222,7 @@ func _test_optional_module_lifecycle() -> void:
 	_expect(manager.install(download_module) == OK, "Optional download module can be installed")
 	_expect(manager.install(content_module) == OK, "Optional content module can be installed")
 	_expect(manager.install(table_module) == OK, "Optional table module can be installed")
+	_expect(manager.install(connectivity_module) == OK, "Optional connectivity module can be installed")
 	_expect(manager.install(resource_module) == OK, "Resource module can coexist with optional modules")
 	_expect(manager.initialize_all() == OK and manager.start_all() == OK, "Optional modules start through module manager")
 	_expect(
@@ -232,6 +239,7 @@ func _test_optional_module_lifecycle() -> void:
 	_expect(services.resolve(GFServiceIds.DOWNLOADS) is GFDownloadService, "Download module registers its service")
 	_expect(services.resolve(GFServiceIds.CONTENT) is GFContentService, "Content module registers its service")
 	_expect(services.resolve(GFServiceIds.TABLES) is GFTableService, "Table module registers its service")
+	_expect(services.resolve(GFServiceIds.CONNECTIVITY) is GFConnectivityService, "Connectivity module registers its service")
 	manager.shutdown_all()
 	_expect(not services.has(GFServiceIds.UI), "UI module removes its service during shutdown")
 	_expect(not services.has(GFServiceIds.AUDIO), "Audio module removes its service during shutdown")
@@ -243,6 +251,7 @@ func _test_optional_module_lifecycle() -> void:
 	_expect(not services.has(GFServiceIds.DOWNLOADS), "Download module removes its service during shutdown")
 	_expect(not services.has(GFServiceIds.CONTENT), "Content module removes its service during shutdown")
 	_expect(not services.has(GFServiceIds.TABLES), "Table module removes its service during shutdown")
+	_expect(not services.has(GFServiceIds.CONNECTIVITY), "Connectivity module removes its service during shutdown")
 
 	var existing_input_service := RefCounted.new()
 	var failure_services := GFServiceContainer.new()
@@ -805,6 +814,286 @@ func _test_table_service() -> void:
 	_expect(not tables.unregister_provider(&"memory", GFMemoryTestTableProvider.new()), "Table provider unregister checks owner identity")
 	_expect(tables.unregister_provider(&"memory", provider) and provider.cleared, "Owned table provider is cleared on removal")
 	tables.shutdown()
+
+
+func _test_connectivity_service() -> void:
+	var invalid_settings := GFConnectivitySettings.new()
+	invalid_settings.http_request_body_limit_bytes = 8
+	invalid_settings.http_max_queued_body_bytes = 4
+	_expect(not invalid_settings.validate().is_empty(), "Connectivity settings reject inconsistent HTTP byte limits")
+	var invalid_capacity := GFConnectivitySettings.new()
+	invalid_capacity.http_max_concurrent = 2
+	invalid_capacity.http_max_in_flight_requests = 1
+	_expect(not invalid_capacity.validate().is_empty(), "Connectivity settings reject in-flight capacity below concurrency")
+	var invalid_channel := GFWebSocketChannelDefinition.new()
+	invalid_channel.channel_id = &"invalid"
+	invalid_channel.url = "https://example.test/socket"
+	_expect(not invalid_channel.validate().is_empty(), "WebSocket channel rejects non-WebSocket URLs")
+	var default_channel := GFWebSocketChannelDefinition.new()
+	default_channel.channel_id = &"default"
+	default_channel.url = "wss://example.test/socket"
+	_expect(default_channel.validate().is_empty(), "WebSocket channel defaults form a valid bounded configuration")
+
+	var settings := GFConnectivitySettings.new()
+	settings.root_name = "ConnectivityServiceTest"
+	settings.http_max_concurrent = 1
+	settings.http_max_in_flight_requests = 2
+	settings.http_request_body_limit_bytes = 8
+	settings.http_max_queued_body_bytes = 8
+	settings.http_response_body_limit_bytes = 32
+	settings.http_timeout_seconds = 0.5
+	settings.request_timeout_seconds = 0.5
+	var factory := GFConnectivityTestBackendFactory.new()
+	factory.http_plans = [
+		{"response_code": 503, "body": "busy".to_utf8_buffer()},
+		{},
+		{},
+		{"body": "x".repeat(33).to_utf8_buffer()},
+	]
+	var service := GFConnectivityService.new(
+		self,
+		settings,
+		factory.create_http,
+		factory.create_websocket,
+	)
+	var completed_http: Array[int] = []
+	var failed_http: Array[Dictionary] = []
+	service.http.request_completed.connect(
+		func(request_id: int, _code: int, _headers: PackedStringArray, _body: PackedByteArray, _tag: StringName) -> void:
+			completed_http.append(request_id)
+	)
+	service.http.request_failed.connect(
+		func(request_id: int, error: Error, _result: int, _code: int, _tag: StringName) -> void:
+			failed_http.append({"id": request_id, "error": error})
+	)
+	_expect(service.http.request("file:///unsafe") == 0, "HTTP queue rejects non-HTTP URLs")
+	_expect(
+		service.http.request("https://example.test/large", HTTPClient.METHOD_POST, PackedStringArray(), PackedByteArray([0, 1, 2, 3, 4, 5, 6, 7, 8])) == 0,
+		"HTTP queue rejects oversized request bodies",
+	)
+	var first_body := "first".to_utf8_buffer()
+	var first_id := service.http.request(
+		"https://example.test/first",
+		HTTPClient.METHOD_POST,
+		PackedStringArray(["Content-Type: application/octet-stream"]),
+		first_body,
+		0.25,
+		&"batch",
+	)
+	var second_id := service.http.request("https://example.test/second", HTTPClient.METHOD_GET, PackedStringArray(), PackedByteArray(), -1.0, &"batch")
+	_expect(first_id > 0 and second_id > first_id, "HTTP queue assigns monotonic request IDs")
+	_expect(
+		service.http.active_count() == 1 and service.http.queued_count() == 1 and service.http.in_flight_count() == 2,
+		"HTTP queue enforces bounded concurrency and total in-flight capacity",
+	)
+	_expect(service.http.request("https://example.test/full") == 0, "HTTP queue rejects overflow")
+	var first_backend := factory.created_http[0]
+	_expect(
+		first_backend.captured.url == "https://example.test/first"
+		and first_backend.captured.method == HTTPClient.METHOD_POST
+		and first_backend.captured.body == first_body
+		and is_equal_approx(float(first_backend.captured.timeout_seconds), 0.25),
+		"HTTP backend receives raw request data and per-request timeout",
+	)
+	first_backend.complete()
+	_expect(
+		service.http.task_state(first_id) == GFHTTPService.TaskState.COMPLETED
+		and int(service.http.task_info(first_id).response_code) == 503
+		and completed_http == [first_id],
+		"HTTP transport completion preserves response status for application interpretation",
+	)
+	_expect(service.http.task_state(second_id) == GFHTTPService.TaskState.RUNNING, "HTTP queue dispatches the next task after completion")
+	_expect(service.http.cancel(second_id), "Running HTTP request can be cancelled")
+	_expect(service.http.task_state(second_id) == GFHTTPService.TaskState.CANCELLED, "Cancelled HTTP request reaches terminal state")
+	var timeout_id := service.http.request("https://example.test/timeout", HTTPClient.METHOD_GET, PackedStringArray(), PackedByteArray(), 0.1)
+	service.update(0.11)
+	_expect(
+		service.http.task_state(timeout_id) == GFHTTPService.TaskState.FAILED
+		and not failed_http.is_empty()
+		and failed_http.back().error == ERR_TIMEOUT,
+		"HTTP service enforces framework timeout and reports transport failure",
+	)
+	var oversized_response_id := service.http.request("https://example.test/oversized-response")
+	(factory.created_http[3] as GFTestHTTPRequestBackend).complete()
+	_expect(
+		service.http.task_state(oversized_response_id) == GFHTTPService.TaskState.FAILED
+		and failed_http.back().error == ERR_OUT_OF_MEMORY,
+		"HTTP service enforces response limit across custom backends",
+	)
+	_expect(service.http.clear_finished() == 4, "HTTP service can clear terminal request history")
+
+	var tracker := service.requests
+	var resolved: Array[int] = []
+	var timed_out: Array[int] = []
+	var cancelled: Array[int] = []
+	tracker.request_resolved.connect(func(id: int, _response: Variant, _context: Variant) -> void: resolved.append(id))
+	tracker.request_timed_out.connect(func(id: int, _context: Variant) -> void: timed_out.append(id))
+	tracker.request_cancelled.connect(func(id: int, _context: Variant) -> void: cancelled.append(id))
+	var resolve_id := tracker.begin(1.0, {"operation": "resolve"})
+	var timeout_correlation_id := tracker.begin(0.1, {"operation": "timeout"})
+	var cancel_id := tracker.begin(0.0, {"operation": "cancel"})
+	_expect(tracker.resolve(resolve_id, PackedByteArray([1])) and resolved == [resolve_id], "Correlation tracker resolves one pending request")
+	tracker.update(0.11)
+	_expect(not tracker.has(timeout_correlation_id) and timed_out == [timeout_correlation_id], "Correlation tracker expires timed requests")
+	_expect(tracker.cancel(cancel_id) and cancelled == [cancel_id], "Correlation tracker cancels an indefinite request")
+	_expect(not tracker.resolve(resolve_id), "Resolved correlation ID cannot complete twice")
+
+	var primary := GFWebSocketChannelDefinition.new()
+	primary.channel_id = &"primary"
+	primary.url = "wss://example.test/socket"
+	primary.handshake_headers = PackedStringArray(["Authorization: test"])
+	primary.supported_protocols = PackedStringArray(["gf-test"])
+	primary.reconnect_enabled = true
+	primary.reconnect_initial_delay_seconds = 0.5
+	primary.reconnect_max_delay_seconds = 2.0
+	primary.reconnect_multiplier = 2.0
+	primary.max_reconnect_attempts = 3
+	primary.heartbeat_interval_seconds = 5.0
+	primary.inbound_buffer_size = 2048
+	primary.outbound_buffer_size = 1024
+	primary.max_queued_packets = 8
+	primary.max_packet_bytes = 8
+	primary.receive_packet_budget_per_frame = 1
+	primary.send_high_watermark_bytes = 10
+	primary.send_low_watermark_bytes = 3
+	var flaky := primary.duplicate() as GFWebSocketChannelDefinition
+	flaky.channel_id = &"flaky"
+	flaky.reconnect_initial_delay_seconds = 1.0
+	flaky.reconnect_max_delay_seconds = 4.0
+	flaky.max_reconnect_attempts = 2
+	var slow := primary.duplicate() as GFWebSocketChannelDefinition
+	slow.channel_id = &"slow"
+	slow.reconnect_enabled = false
+	slow.connect_timeout_seconds = 0.1
+	var stalled_close := primary.duplicate() as GFWebSocketChannelDefinition
+	stalled_close.channel_id = &"stalled_close"
+	stalled_close.reconnect_enabled = false
+	stalled_close.close_timeout_seconds = 0.1
+	factory.websocket_plans = {
+		&"primary": [
+			{
+				"poll_states": [WebSocketPeer.STATE_OPEN, WebSocketPeer.STATE_OPEN, WebSocketPeer.STATE_OPEN, WebSocketPeer.STATE_CLOSED],
+				"selected_protocol": "gf-test",
+				"close_code": 1006,
+				"close_reason": "lost",
+				"incoming": [
+					{"error": OK, "data": "one".to_utf8_buffer(), "is_text": true},
+					{"error": OK, "data": PackedByteArray([1, 2]), "is_text": false},
+				],
+			},
+			{"poll_states": [WebSocketPeer.STATE_OPEN]},
+		],
+		&"flaky": [
+			{"connect_error": ERR_CANT_CONNECT},
+			{"connect_error": ERR_CANT_CONNECT},
+			{"connect_error": ERR_CANT_CONNECT},
+		],
+		&"slow": [{}],
+		&"stalled_close": [{
+			"poll_states": [WebSocketPeer.STATE_OPEN, WebSocketPeer.STATE_CLOSING, WebSocketPeer.STATE_CLOSING],
+			"close_immediately": false,
+		}],
+	}
+	var sockets := service.websockets
+	var received: Array[Dictionary] = []
+	var writable: Array[StringName] = []
+	var reconnect_delays: Array[float] = []
+	var exhausted: Array[StringName] = []
+	sockets.packet_received.connect(func(channel_id: StringName, data: PackedByteArray, is_text: bool) -> void:
+		received.append({"channel_id": channel_id, "data": data, "is_text": is_text})
+	)
+	sockets.channel_writable.connect(func(channel_id: StringName) -> void: writable.append(channel_id))
+	sockets.reconnect_scheduled.connect(func(_channel_id: StringName, _attempt: int, delay: float) -> void: reconnect_delays.append(delay))
+	sockets.reconnect_exhausted.connect(func(channel_id: StringName, _attempts: int) -> void: exhausted.append(channel_id))
+	_expect(sockets.register_channel(primary) == OK, "WebSocket channel can be registered")
+	_expect(sockets.register_channel(primary) == ERR_ALREADY_EXISTS, "Duplicate WebSocket channel is rejected")
+	primary.url = "https://mutated.invalid"
+	_expect(sockets.connect_channel(&"primary") == OK, "WebSocket channel begins a non-blocking connection")
+	sockets.update(0.1)
+	var primary_backend := (factory.created_websockets[&"primary"] as Array)[0] as GFTestWebSocketBackend
+	_expect(
+		sockets.state(&"primary") == GFWebSocketService.ChannelState.CONNECTED
+		and primary_backend.connected_url == "wss://example.test/socket"
+		and primary_backend.configured.heartbeat_interval == 5.0
+		and primary_backend.configured.protocols == PackedStringArray(["gf-test"]),
+		"WebSocket service owns validated configuration and observes open state",
+	)
+	_expect(received.size() == 1 and received[0].is_text, "WebSocket receive budget limits packets per update")
+	sockets.update(0.1)
+	_expect(received.size() == 2 and not received[1].is_text, "WebSocket service preserves text and binary frame metadata")
+	_expect(sockets.send_text(&"primary", "ping") == OK, "WebSocket channel sends raw text frames")
+	_expect(sockets.send(&"primary", PackedByteArray([0, 1, 2, 3, 4, 5, 6, 7, 8])) == ERR_OUT_OF_MEMORY, "WebSocket channel rejects oversized packets")
+	primary_backend.buffered_bytes = 8
+	_expect(sockets.send(&"primary", PackedByteArray([1, 2, 3])) == ERR_BUSY, "WebSocket high watermark applies send backpressure")
+	_expect(sockets.send(&"primary", PackedByteArray([1])) == ERR_BUSY, "Blocked WebSocket remains blocked until low watermark")
+	primary_backend.buffered_bytes = 2
+	sockets.update(0.1)
+	_expect(writable == [&"primary"], "WebSocket low watermark emits writable transition")
+	_expect(sockets.send(&"primary", PackedByteArray([1])) == OK, "Writable WebSocket accepts binary frames")
+	sockets.update(0.1)
+	_expect(
+		sockets.state(&"primary") == GFWebSocketService.ChannelState.RECONNECT_WAIT
+		and reconnect_delays == [0.5],
+		"Unexpected WebSocket close schedules configured reconnect",
+	)
+	sockets.update(0.5)
+	_expect(sockets.state(&"primary") == GFWebSocketService.ChannelState.CONNECTING, "Reconnect delay starts a fresh backend")
+	sockets.update(0.0)
+	var reconnected_backend := (factory.created_websockets[&"primary"] as Array)[1] as GFTestWebSocketBackend
+	_expect(
+		sockets.state(&"primary") == GFWebSocketService.ChannelState.CONNECTED
+		and reconnected_backend.sent.is_empty(),
+		"Reconnected WebSocket does not replay application frames",
+	)
+	_expect(sockets.disconnect_channel(&"primary", 1000, "done") == OK, "WebSocket supports requested close")
+	sockets.update(0.0)
+	_expect(sockets.state(&"primary") == GFWebSocketService.ChannelState.DISCONNECTED, "Requested WebSocket close does not reconnect")
+	_expect(
+		sockets.connect_channel(&"primary") == OK
+		and sockets.disconnect_channel(&"primary", 1000, "x".repeat(124)) == ERR_INVALID_PARAMETER,
+		"WebSocket close rejects reasons above the RFC byte limit",
+	)
+	sockets.disconnect_channel(&"primary", -1, "")
+	sockets.update(0.0)
+
+	_expect(sockets.register_channel(flaky) == OK, "Second WebSocket channel can be registered")
+	_expect(sockets.connect_channel(&"flaky") == ERR_CANT_CONNECT, "Immediate WebSocket connection error is propagated")
+	_expect(sockets.state(&"flaky") == GFWebSocketService.ChannelState.RECONNECT_WAIT, "Failed WebSocket connection enters reconnect wait")
+	sockets.update(1.0)
+	_expect(
+		sockets.state(&"flaky") == GFWebSocketService.ChannelState.RECONNECT_WAIT
+		and reconnect_delays.slice(1) == [1.0, 2.0],
+		"WebSocket reconnect delay grows exponentially",
+	)
+	sockets.update(2.0)
+	_expect(
+		sockets.state(&"flaky") == GFWebSocketService.ChannelState.DISCONNECTED
+		and exhausted == [&"flaky"],
+		"WebSocket reconnect attempts stop at the configured limit",
+	)
+	_expect(sockets.register_channel(slow) == OK and sockets.connect_channel(&"slow") == OK, "Connecting WebSocket can enter timeout fixture")
+	sockets.update(0.11)
+	_expect(sockets.state(&"slow") == GFWebSocketService.ChannelState.DISCONNECTED, "WebSocket connection timeout closes an unresponsive channel")
+	_expect(
+		sockets.register_channel(stalled_close) == OK
+		and sockets.connect_channel(&"stalled_close") == OK,
+		"WebSocket close-timeout fixture can connect",
+	)
+	sockets.update(0.0)
+	sockets.disconnect_channel(&"stalled_close", 1000, "closing")
+	sockets.update(0.11)
+	_expect(
+		sockets.state(&"stalled_close") == GFWebSocketService.ChannelState.DISCONNECTED,
+		"WebSocket close timeout force-closes an unresponsive peer",
+	)
+	var http_service := service.http
+	service.shutdown()
+	service.shutdown()
+	_expect(
+		http_service.request("https://example.test/closed") == 0
+		and sockets.register_channel(default_channel) == ERR_UNCONFIGURED,
+		"Connectivity shutdown is idempotent and rejects new work",
+	)
 
 
 func _test_settings_service() -> void:

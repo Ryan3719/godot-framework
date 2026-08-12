@@ -33,7 +33,7 @@ The Godot ecosystem has many domain frameworks and templates. It has fewer gener
 | Godot Resource workflows | Typed framework and module configuration |
 | Godot signals | Public asynchronous module events |
 
-The resource module calls `load_threaded_get()` for every accepted threaded request, including during framework shutdown, because the engine retains a user load token until that result is collected. The scene module treats the caller scene as invalid immediately after a successful change request; the engine queues the old scene for deletion as part of `change_scene_to_packed()`. Storage uses `get_var(false)` so decoded data cannot instantiate serialized objects. Content delivery uses `ProjectSettings.load_resource_pack()` and treats mounting as process-lifetime state because Godot 4.4 has no public resource-pack unload API.
+The resource module calls `load_threaded_get()` for every accepted threaded request, including during framework shutdown, because the engine retains a user load token until that result is collected. The scene module treats the caller scene as invalid immediately after a successful change request; the engine queues the old scene for deletion as part of `change_scene_to_packed()`. Storage uses `get_var(false)` so decoded data cannot instantiate serialized objects. Content delivery uses `ProjectSettings.load_resource_pack()` and treats mounting as process-lifetime state because Godot 4.4 has no public resource-pack unload API. Connectivity polls `WebSocketPeer` every frame, uses its real outbound buffered byte count for backpressure, and maps its native ping interval without claiming that browser exports support it.
 
 ## Rejected Or Deferred
 
@@ -57,9 +57,9 @@ GDScript lacks C#'s compile-time interface guarantees and broad reflection-based
 
 Godot resource loading and ownership stay separate from release delivery. PCK manifests, downloads, signing, activation, rollback, and platform constraints belong to the optional content-delivery modules and must not be implied by a cache wrapper. CDN policy, resumable transfers, and exported-platform validation remain release integration work rather than resource-service responsibilities.
 
-### Networking protocol in core
+### One universal networking protocol in core
 
-TCP, WebSocket, ENet, HTTP, Steam, rollback, and authoritative multiplayer need different contracts. A future transport-agnostic module should be designed from concrete use cases; no fake universal API is included now.
+TCP, WebSocket, ENet, HTTP, Steam, rollback, and authoritative multiplayer need different contracts. The connectivity module therefore keeps request/response HTTP, long-lived WebSocket channels, and correlation tracking as separate capabilities. ENet and platform transports remain adapters to add only from demonstrated use cases; no fake universal packet API is included.
 
 ### Generic UI framework in core
 

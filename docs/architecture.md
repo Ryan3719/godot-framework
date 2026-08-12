@@ -14,7 +14,8 @@ Application / game
                          |
 Optional framework modules
   Resource, scene, storage, settings, pool, state machine,
-  UI, audio, input, localization, download, content, tables
+  UI, audio, input, localization, download, content, tables,
+  connectivity
                          |
 Stable framework kernel
   Host, module lifecycle, services, events, messages, logging
@@ -58,7 +59,7 @@ Framework and module configuration uses typed Godot `Resource` objects. The addo
 
 Resources hold authorable configuration. Runtime save data is restricted to object-free Variants and never serializes `Node`, `Resource`, texture, audio, or arbitrary script objects.
 
-The addon default enables the foundation modules and keeps UI, audio, input, localization, download, content, and tables disabled. Enabling those modules is an explicit project decision:
+The addon default enables the foundation modules and keeps UI, audio, input, localization, download, content, tables, and connectivity disabled. Enabling those modules is an explicit project decision:
 
 - UI owns a node root and configured `CanvasLayer` instances. Routes point to project-owned scenes whose roots extend `GFUIView`; the framework owns navigation lifecycle, not screen content.
 - Audio owns its players beneath one node root. Project configuration defines logical groups and buses, while playback handles and group volume are runtime state.
@@ -78,6 +79,14 @@ The content module accepts detached RSA-SHA256 signatures over the exact manifes
 Godot 4.4 exposes `ProjectSettings.load_resource_pack()` but no matching unload API. Consequently, a partially mounted release cannot be removed from the current process. The module restores the previous activation pointer for the next startup, locks further mounts, and exposes `restart_required`. It never claims same-process PCK rollback.
 
 The table module is only a provider registry. It does not impose JSON, CSV, Luban, SQLite, row ID, or generated-code conventions on applications.
+
+## Connectivity
+
+`GFConnectivityService` groups three distinct capabilities without pretending they share one transport contract. `GFHTTPService` owns bounded request concurrency, queued-body memory limits, cancellation, transport timeouts, and response size limits. An HTTP response is transport-complete regardless of status code; application adapters decide whether `404`, `409`, or `503` represents a domain success, retry, or failure.
+
+`GFWebSocketService` owns named channel lifecycles, non-blocking connection polling, optional reconnect schedules, per-frame receive budgets, maximum packet size, and high/low send-buffer watermarks. It exposes raw text/binary frames and never parses envelopes, invents message IDs, or automatically replays packets after reconnect. Applications that require delivery guarantees must define acknowledgements, idempotency, ordering, and replay policy in their protocol adapter.
+
+Godot 4.4 `WebSocketPeer` supplies native ping control frames through `heartbeat_interval`, but Web exports ignore that property due to browser restrictions. Browser deployments that require liveness detection need an application-protocol heartbeat. `GFRequestTracker` provides only correlation ID ownership plus resolve/timeout/cancel lifecycle; it deliberately does not serialize or route protocol messages.
 
 ## Storage Safety
 
@@ -100,4 +109,4 @@ This is a recoverable local persistence mechanism, not an encrypted or tamper-re
 
 `GFAudioService` normally calls `AudioStreamPlayer.play()` and `stop()`. Its constructor also accepts playback callables so deterministic headless tests can exercise ownership and concurrency without creating a live `AudioServer` playback. This is a test boundary, not a second production audio backend.
 
-Download tests inject `GFDownloadBackend` instances to simulate status codes and partial files deterministically. Content tests inject a mount callable for failure/rollback paths, while a separate process creates and mounts a real PCK through Godot's engine API.
+Download tests inject `GFDownloadBackend` instances to simulate status codes and partial files deterministically. Content tests inject a mount callable for failure/rollback paths, while a separate process creates and mounts a real PCK through Godot's engine API. Connectivity tests inject HTTP and WebSocket backends for timeout, reconnect, receive-budget, and backpressure paths; a local loopback server separately exercises the real `HTTPRequest` and `WebSocketPeer` adapters.

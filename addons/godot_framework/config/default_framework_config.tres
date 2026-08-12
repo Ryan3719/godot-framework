@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=40 format=3]
+[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=43 format=3]
 
 [ext_resource type="Script" path="res://addons/godot_framework/core/framework_config.gd" id="1_config"]
 [ext_resource type="Script" path="res://addons/godot_framework/core/module_definition.gd" id="2_definition"]
@@ -24,6 +24,8 @@
 [ext_resource type="Script" path="res://addons/godot_framework/modules/content/content_module.gd" id="22_content_module"]
 [ext_resource type="Resource" path="res://addons/godot_framework/config/default_content_settings.tres" id="23_content_settings"]
 [ext_resource type="Script" path="res://addons/godot_framework/modules/data/table_module.gd" id="24_table_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/connectivity/connectivity_module.gd" id="25_connectivity_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_connectivity_settings.tres" id="26_connectivity_settings"]
 
 [sub_resource type="Resource" id="ModuleDefinition_resource"]
 script = ExtResource("2_definition")
@@ -93,6 +95,12 @@ script = ExtResource("2_definition")
 enabled = false
 module_script = ExtResource("24_table_module")
 
+[sub_resource type="Resource" id="ModuleDefinition_connectivity"]
+script = ExtResource("2_definition")
+enabled = false
+module_script = ExtResource("25_connectivity_module")
+settings = ExtResource("26_connectivity_settings")
+
 [resource]
 script = ExtResource("1_config")
-modules = Array[ExtResource("2_definition")]([SubResource("ModuleDefinition_resource"), SubResource("ModuleDefinition_scene"), SubResource("ModuleDefinition_storage"), SubResource("ModuleDefinition_settings"), SubResource("ModuleDefinition_pool"), SubResource("ModuleDefinition_fsm"), SubResource("ModuleDefinition_ui"), SubResource("ModuleDefinition_audio"), SubResource("ModuleDefinition_input"), SubResource("ModuleDefinition_localization"), SubResource("ModuleDefinition_download"), SubResource("ModuleDefinition_content"), SubResource("ModuleDefinition_tables")])
+modules = Array[ExtResource("2_definition")]([SubResource("ModuleDefinition_resource"), SubResource("ModuleDefinition_scene"), SubResource("ModuleDefinition_storage"), SubResource("ModuleDefinition_settings"), SubResource("ModuleDefinition_pool"), SubResource("ModuleDefinition_fsm"), SubResource("ModuleDefinition_ui"), SubResource("ModuleDefinition_audio"), SubResource("ModuleDefinition_input"), SubResource("ModuleDefinition_localization"), SubResource("ModuleDefinition_download"), SubResource("ModuleDefinition_content"), SubResource("ModuleDefinition_tables"), SubResource("ModuleDefinition_connectivity")])
