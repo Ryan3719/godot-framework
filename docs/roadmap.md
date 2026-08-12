@@ -28,7 +28,7 @@ Exit criteria: modules can be enabled independently at runtime and do not ship b
 
 ## 0.3 Content Delivery
 
-Status: implemented for Godot 4.4-compatible desktop behavior in the current development branch. Linux release exports are validated in CI; Windows/macOS and exported mobile validation plus bandwidth/resume policy remain release-hardening work.
+Status: implemented for Godot 4.4-compatible desktop behavior in the current development branch. Linux and macOS release exports are validated in CI; Windows and exported mobile validation plus bandwidth/resume policy remain release-hardening work.
 
 - Resource ownership handles with transient, leased, and retained cache policies
 - HTTP download queue with bounded concurrency, progress, retry, cancellation, safe relative targets, and transactional replacement
@@ -42,7 +42,7 @@ Exit criteria for a stable release: exported desktop/mobile validation, CDN inte
 
 ## 0.4 Connectivity
 
-Status: implemented for Godot 4.4-compatible desktop behavior in the current development branch. Linux release exports are validated in CI; Windows/macOS, exported Web/mobile validation, and application-protocol integration remain release-hardening work.
+Status: implemented for Godot 4.4-compatible desktop behavior in the current development branch. Linux and macOS release exports are validated in CI; Windows, exported Web/mobile validation, and application-protocol integration remain release-hardening work.
 
 - Bounded HTTP request queue with raw byte bodies, tags, cancellation, timeout, TLS options, redirects, and response size limits
 - Named WebSocket channel lifecycle with non-blocking polling, clean close, connection timeout, and bounded reconnect policy
@@ -60,7 +60,7 @@ Status: implemented in the current development branch. Asset Library publication
 
 - Framework configuration validator, structured issue codes, editor dock, and headless runner
 - Declarative module metadata that can be validated without executing runtime modules in the editor
-- Deterministic Godot Asset Library-compatible package with checksum, clean-project installation, and Linux release-export execution tests
+- Deterministic Godot Asset Library-compatible package with checksum, clean-project installation, and Linux/macOS release-export execution tests
 - Release-tag workflow with exact version matching and development-version rejection
 - Semantic versioning, changelog, upgrade guide, distribution guide, and API stability tiers
 - Bounded event backlog and performance smoke benchmarks with machine-readable results

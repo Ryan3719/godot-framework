@@ -9,7 +9,7 @@ Godot Framework follows Semantic Versioning: `MAJOR.MINOR.PATCH`.
 - Patch releases fix behavior without intentionally changing documented contracts.
 - Versions ending in `-dev` are unreleased development snapshots and cannot be published by the release workflow.
 
-The supported engine range currently starts at Godot 4.4. CI validates editor/headless behavior and Linux release exports on both the minimum version, 4.4.1, and the current compatibility version, 4.7.1. Other exported platforms require separate evidence; a future engine version is not supported merely because it parses the project.
+The supported engine range currently starts at Godot 4.4. CI validates editor/headless behavior plus Linux and macOS release exports on both the minimum version, 4.4.1, and the current compatibility version, 4.7.1. Other exported platforms require separate evidence; a future engine version is not supported merely because it parses the project.
 
 ## Stability Tiers
 

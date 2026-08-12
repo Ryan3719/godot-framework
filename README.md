@@ -97,7 +97,7 @@ godot --headless --verbose --path . tests/config_validation_runner.tscn
 godot --headless --verbose --path . tests/performance_runner.tscn
 ```
 
-The test project currently runs 366 assertions plus configuration, performance-smoke, clean-package installation, Linux release-export execution, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. The CI matrix uses matching export templates for Godot 4.4.1 and 4.7.1 and treats parse errors, engine errors, leaked objects, and resources left in use as failures.
+The test project currently runs 366 assertions plus configuration, performance-smoke, clean-package installation, Linux and macOS release-export execution, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. CI uses matching export templates for Godot 4.4.1 and 4.7.1 and treats parse errors, engine errors, leaked objects, and resources left in use as failures.
 
 ## Documentation
 
