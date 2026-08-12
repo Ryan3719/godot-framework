@@ -39,9 +39,12 @@ try {
     $Executable = Join-Path $ExportDir "godot-framework-test.exe"
     $ConsoleExecutable = Join-Path $ExportDir "godot-framework-test.console.exe"
 
-    Invoke-Logged $GodotBin @("--headless", "--editor", "--quit", "--path", $ProjectDir) $EditorLog
-    Invoke-Logged $GodotBin @("--headless", "--path", $ProjectDir, "--export-release", "Windows", $Executable) $ExportLog
+    $ExportTarget = $Executable.Replace("\", "/")
+    Invoke-Logged -Executable $GodotBin -Arguments @("--headless", "--editor", "--quit", "--path", $ProjectDir) -LogPath $EditorLog
+    Invoke-Logged -Executable $GodotBin -Arguments @("--headless", "--path", $ProjectDir, "--export-release", "Windows", $ExportTarget) -LogPath $ExportLog
     if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
+        Get-Content $ExportLog
+        Get-ChildItem -LiteralPath $ProjectDir, $ExportDir -Recurse | Select-Object -ExpandProperty FullName
         throw "Windows export did not create the executable."
     }
     if (-not (Test-Path -LiteralPath $ConsoleExecutable -PathType Leaf)) {
@@ -49,7 +52,7 @@ try {
     }
     Push-Location $ExportDir
     try {
-        Invoke-Logged $ConsoleExecutable @("--headless", "--verbose") $RunLog
+        Invoke-Logged -Executable $ConsoleExecutable -Arguments @("--headless", "--verbose") -LogPath $RunLog
     } finally {
         Pop-Location
     }
