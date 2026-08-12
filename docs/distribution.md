@@ -16,9 +16,19 @@ bash tests/verify_linux_export.sh dist/godot-framework-0.5.0-dev.zip "$(command 
 bash tests/verify_macos_export.sh dist/godot-framework-0.5.0-dev.zip "$(command -v godot)"
 ```
 
-The builder sorts paths and normalizes timestamps, permissions, and compression so identical source bytes produce an identical ZIP and SHA-256 checksum. The installation test extracts the package into a temporary clean project, lets the editor import it, and verifies the six enabled foundation modules plus all disabled optional modules. Linux and macOS export tests then use the same clean project and matching official release templates, execute the exported binary or app bundle, verify the same runtime boundary outside the editor, and confirm the EditorPlugin, validation dock, and plugin metadata were excluded. Export output is written outside the project so `all_resources` cannot ingest a partially generated artifact.
+On Windows, run the corresponding PowerShell verifier:
+
+```powershell
+./tests/verify_windows_export.ps1 -PackagePath dist/godot-framework-0.5.0-dev.zip -GodotBin (Get-Command godot).Source
+```
+
+The builder sorts paths and normalizes timestamps, permissions, and compression. The repository enforces LF checkout bytes through `.gitattributes`, and CI compares SHA-256 checksums from Linux, macOS, and Windows package builds on both supported Godot versions. The installation test extracts the package into a temporary clean project, lets the editor import it, and verifies the six enabled foundation modules plus all disabled optional modules. Desktop export tests then use the same clean project and matching official release templates, execute the exported ELF, app bundle, or Windows console wrapper, verify the same runtime boundary outside the editor, and confirm the EditorPlugin, validation dock, and plugin metadata were excluded. Export output is written outside the project so `all_resources` cannot ingest a partially generated artifact.
+
+The Windows test fixture disables PE resource editing because it does not ship application metadata and should not depend on the external `rcedit` tool. Production projects that modify icons or version resources must configure and validate their own Windows export toolchain.
 
 The macOS CI artifact uses Godot's ad-hoc signing mode. This validates bundle creation and execution on the hosted runner; it does not validate Developer ID signing, notarization, entitlements, or Mac App Store submission.
+
+These desktop checks validate packaging and the default runtime modules. Optional content-delivery and connectivity modules still require platform-specific exported integration in a consuming project; Web and mobile exports are not covered yet.
 
 Generated `dist/` output is not source and should not be committed.
 
