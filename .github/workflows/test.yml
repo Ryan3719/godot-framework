@@ -100,3 +100,31 @@ jobs:
           python3 scripts/verify_addon_package.py "$package_path"
           bash tests/verify_addon_package.sh "$package_path" "$(command -v godot)"
           bash tests/verify_linux_export.sh "$package_path" "$(command -v godot)"
+
+  macos-export:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        godot-version: [4.4.1, 4.7.1]
+    name: macOS export (${{ matrix.godot-version }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2.4.1
+        with:
+          version: ${{ matrix.godot-version }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Build and run macOS release export
+        run: |
+          set -euo pipefail
+          package_dir=$(mktemp -d)
+          package_path="$package_dir/godot-framework.zip"
+          python3 scripts/package_addon.py --output "$package_path"
+          python3 scripts/verify_addon_package.py "$package_path"
+          bash tests/verify_macos_export.sh "$package_path" "$(command -v godot)"

@@ -27,7 +27,7 @@ func _ready() -> void:
 		)
 	if valid:
 		if verify_export:
-			print("[EXPORT TEST] PASS: packaged addon runs in Linux release export")
+			print("[EXPORT TEST] PASS: packaged addon runs in release export")
 		else:
 			print("[PACKAGE TEST] PASS: packaged addon installs with minimal defaults")
 		framework.shutdown()
