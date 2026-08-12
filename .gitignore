@@ -1,0 +1,18 @@
+# Godot 4 generated files
+.godot/
+
+# Export output
+build/
+dist/
+
+# Mono / C# generated files
+.mono/
+data_*/
+mono_crash.*.json
+
+# Local editor and operating system files
+.DS_Store
+.idea/
+.vscode/
+*.translation
+export_presets.cfg
