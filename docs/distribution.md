@@ -13,9 +13,11 @@ python3 scripts/package_addon.py
 python3 scripts/verify_addon_package.py dist/godot-framework-0.5.0-dev.zip
 bash tests/verify_addon_package.sh dist/godot-framework-0.5.0-dev.zip "$(command -v godot)"
 bash tests/verify_reference_consumer.sh dist/godot-framework-0.5.0-dev.zip "$(command -v godot)"
+bash tests/verify_reference_consumer_linux_export.sh dist/godot-framework-0.5.0-dev.zip "$(command -v godot)"
 bash tests/verify_linux_export.sh dist/godot-framework-0.5.0-dev.zip "$(command -v godot)"
 bash tests/verify_macos_export.sh dist/godot-framework-0.5.0-dev.zip "$(command -v godot)"
 python3 tests/verify_web_export.py dist/godot-framework-0.5.0-dev.zip --godot "$(command -v godot)"
+python3 tests/verify_reference_consumer_web_export.py dist/godot-framework-0.5.0-dev.zip --godot "$(command -v godot)"
 ```
 
 On Windows, run the corresponding PowerShell verifier:
@@ -24,7 +26,7 @@ On Windows, run the corresponding PowerShell verifier:
 ./tests/verify_windows_export.ps1 -PackagePath dist/godot-framework-0.5.0-dev.zip -GodotBin (Get-Command godot).Source
 ```
 
-The builder sorts paths and normalizes timestamps, permissions, and compression. The repository enforces LF checkout bytes through `.gitattributes`, and CI compares SHA-256 checksums from Linux, macOS, and Windows package builds on both supported Godot versions. The installation test extracts the package into a temporary clean project, lets the editor import it, and enables all 14 modules with valid, integration-free settings. It checks module startup and shutdown, service registration, and framework-owned runtime roots. A separate reference-consumer check installs that same ZIP into a project with its own configuration resources and concrete UI scene, then exercises resource ownership, settings and save paths, input profile round-trip, owned translations, route lifecycle, validation, and shutdown. Release export tests use the all-module clean project and matching official templates, execute the exported ELF, app bundle, Windows console wrapper, single-threaded Web build in headless Chrome, or Android APK on an API 35 x86_64 emulator, verify that lifecycle boundary outside the editor, and confirm the EditorPlugin, validation dock, and plugin metadata were excluded. Export output is written outside the project so `all_resources` cannot ingest a partially generated artifact.
+The builder sorts paths and normalizes timestamps, permissions, and compression. The repository enforces LF checkout bytes through `.gitattributes`, and CI compares SHA-256 checksums from Linux, macOS, and Windows package builds on both supported Godot versions. The installation test extracts the package into a temporary clean project, lets the editor import it, and enables all 14 modules with valid, integration-free settings. It checks module startup and shutdown, service registration, and framework-owned runtime roots. A separate reference-consumer check installs that same ZIP into a project with its own configuration resources and concrete UI scene, then exercises resource ownership, settings and save paths, input profile round-trip, owned translations, route lifecycle, validation, and shutdown. That reference project also runs from Linux and single-threaded Web release exports. Release export tests use matching official templates, execute the exported ELF, app bundle, Windows console wrapper, single-threaded Web build in headless Chrome, or Android APK on an API 35 x86_64 emulator, verify those runtime contracts outside the editor, and confirm the EditorPlugin, validation dock, and plugin metadata were excluded. Export output is written outside the project so `all_resources` cannot ingest a partially generated artifact.
 
 The Web verifier requires ChromeDriver, accepts `--chromedriver`, and also checks `CHROMEWEBDRIVER` plus the current `PATH`. It serves the exported files only on loopback, requires both the exported runtime pass marker and a browser-visible completion title, and rejects browser console errors.
 
@@ -34,7 +36,7 @@ The macOS CI artifact uses Godot's ad-hoc signing mode. This validates bundle cr
 
 Android CI exports an unsigned APK, verifies that state, aligns it, signs it with an ephemeral test JKS, verifies the package name, signature, and x86_64 ABI, then installs, starts, and removes it on an API 35 emulator. The test uses the supported `swangle` software graphics mode because the emulator's deprecated indirect graphics modes do not provide a reliable Godot Compatibility renderer. This is execution evidence for all-module lifecycle and service registration only, not a production signing workflow.
 
-These export checks validate packaging and module lifecycle. Project routes, audio playback, input bindings, translation resources, downloads, PCK mounting, and HTTP/WebSocket protocol adapters still require platform-specific exported integration in a consuming project. Threaded Web, AAB generation, Play publishing, production Android signing, and iOS exports are not covered.
+These export checks validate packaging and module lifecycle on every covered target. The reference consumer additionally validates project routes, input bindings, translation resources, settings, and save paths on Linux and single-threaded Web. Audio playback, downloads, PCK mounting, HTTP/WebSocket protocol adapters, threaded Web, AAB generation, Play publishing, production Android signing, and iOS exports are not covered.
 
 Generated `dist/` output is not source and should not be committed.
 

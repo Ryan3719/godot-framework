@@ -60,7 +60,7 @@ Status: implemented in the current development branch. Asset Library publication
 
 - Framework configuration validator, structured issue codes, editor dock, and headless runner
 - Declarative module metadata that can be validated without executing runtime modules in the editor
-- Deterministic Godot Asset Library-compatible package with cross-OS checksum comparison, clean-project all-module lifecycle installation, a package-installed reference consumer that exercises project-owned UI/input/localization/persistence integration, and Linux/macOS/Windows/Web/Android release-export execution tests
+- Deterministic Godot Asset Library-compatible package with cross-OS checksum comparison, clean-project all-module lifecycle installation, a package-installed reference consumer that exercises project-owned UI/input/localization/persistence integration headlessly plus in Linux and single-threaded Web releases, and Linux/macOS/Windows/Web/Android release-export execution tests
 - Release-tag workflow with exact version matching and development-version rejection
 - Semantic versioning, changelog, upgrade guide, distribution guide, and API stability tiers
 - Bounded event backlog and performance smoke benchmarks with machine-readable results

@@ -21,6 +21,7 @@ All notable changes to this project are documented in this file. The project fol
 - Android release APK export, ephemeral test signing, x86_64 ABI verification, and API 35 emulator execution on both supported Godot versions
 - Clean-package installation and all supported release exports now start all 14 built-in modules with integration-free consumer settings
 - Package-installed reference consumer exercising project-owned configuration, UI routing, input profile restoration, localization, settings, and persistence
+- Linux and single-threaded Web release-export execution for the package-installed reference consumer
 - Size-bounded, checksummed storage envelopes with backup fallback for missing or corrupt primaries
 
 ### Changed
@@ -38,4 +39,4 @@ All notable changes to this project are documented in this file. The project fol
 - Public APIs remain development-tier until the first stable release
 - Godot 4.4 cannot unload mounted PCK files in the same process
 - Resumable downloads, bandwidth throttling, arbitrary script hot reload, and universal networking protocols are not claimed
-- Release exports validate all-module lifecycle only. A headless reference consumer validates project routes, input bindings, translation resources, settings, and save paths; their exported paths, plus audio playback, downloads, PCK mounting, protocol adapters, AAB or Play workflows, production signing, and iOS remain unverified
+- All-module release exports validate lifecycle only. The reference consumer validates project routes, input bindings, translation resources, settings, and save paths headlessly plus in Linux and single-threaded Web exports; audio playback, downloads, PCK mounting, protocol adapters, AAB or Play workflows, production signing, and iOS remain unverified

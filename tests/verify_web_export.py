@@ -194,7 +194,7 @@ def read_browser_log(base_url, session_id):
     return entries if isinstance(entries, list) else []
 
 
-def validate_browser_log(entries, log_path, require_pass_marker=False):
+def validate_browser_log(entries, log_path, pass_log_marker=None):
     lines = []
     severe = []
     for entry in entries:
@@ -207,11 +207,21 @@ def validate_browser_log(entries, log_path, require_pass_marker=False):
     log_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     if severe:
         raise RuntimeError("browser reported errors:\n" + "\n".join(severe))
-    if require_pass_marker and not any(PASS_LOG_MARKER in line for line in lines):
-        raise RuntimeError("browser log did not contain the exported runtime pass marker")
+    if pass_log_marker and not any(pass_log_marker in line for line in lines):
+        raise RuntimeError(
+            f"browser log did not contain the exported runtime pass marker: {pass_log_marker}"
+        )
 
 
-def run_browser(export_dir, chromedriver, timeout_seconds, work_dir):
+def run_browser(
+    export_dir,
+    chromedriver,
+    timeout_seconds,
+    work_dir,
+    pass_title=PASS_TITLE,
+    fail_title=FAIL_TITLE,
+    pass_log_marker=PASS_LOG_MARKER,
+):
     handler = functools.partial(QuietHandler, directory=str(export_dir))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -244,9 +254,9 @@ def run_browser(export_dir, chromedriver, timeout_seconds, work_dir):
             result = None
             while time.monotonic() < deadline:
                 result = read_web_result(driver_url, session_id)
-                if result == PASS_TITLE:
+                if result == pass_title:
                     break
-                if result == FAIL_TITLE:
+                if result == fail_title:
                     entries = read_browser_log(driver_url, session_id)
                     validate_browser_log(entries, browser_log_path)
                     browser_log = browser_log_path.read_text(
@@ -267,7 +277,7 @@ def run_browser(export_dir, chromedriver, timeout_seconds, work_dir):
             validate_browser_log(
                 read_browser_log(driver_url, session_id),
                 browser_log_path,
-                require_pass_marker=True,
+                pass_log_marker=pass_log_marker,
             )
     except Exception as error:
         diagnostics = ""

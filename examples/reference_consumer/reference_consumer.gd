@@ -3,6 +3,9 @@ extends Node
 const STATUS_ROUTE := &"reference.status"
 const CONFIRM_ACTION := &"reference.confirm"
 const STORAGE_SLOT := &"reference_session"
+const EXPORT_VERIFICATION_FEATURE := "reference_consumer_export_verify"
+const WEB_PASS_TITLE := "GF_REFERENCE_CONSUMER_EXPORT_PASS"
+const WEB_FAIL_TITLE := "GF_REFERENCE_CONSUMER_EXPORT_FAIL"
 
 
 func _ready() -> void:
@@ -18,9 +21,14 @@ func _ready() -> void:
 			framework.shutdown()
 			await get_tree().process_frame
 			succeeded = succeeded and framework.services == null
-		if not succeeded:
+		if succeeded:
+			if _is_export_verification():
+				print("[REFERENCE CONSUMER EXPORT] PASS: project integration paths succeeded in release export")
+		else:
 			push_error("[REFERENCE CONSUMER] Automated shutdown contract failed.")
-		get_tree().quit(0 if succeeded else 1)
+		_set_web_result(succeeded)
+		if not OS.has_feature("web"):
+			get_tree().quit(0 if succeeded else 1)
 
 
 func _exercise_framework(framework: GFFrameworkHost) -> bool:
@@ -95,4 +103,19 @@ func _fail(stage: String) -> bool:
 
 
 func _is_automated_run() -> bool:
-	return OS.get_cmdline_user_args().has("--verify-reference-consumer")
+	return (
+		OS.get_cmdline_user_args().has("--verify-reference-consumer")
+		or _is_export_verification()
+	)
+
+
+func _is_export_verification() -> bool:
+	return OS.has_feature(EXPORT_VERIFICATION_FEATURE)
+
+
+func _set_web_result(succeeded: bool) -> void:
+	if not OS.has_feature("web") or not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge := Engine.get_singleton("JavaScriptBridge")
+	var title := WEB_PASS_TITLE if succeeded else WEB_FAIL_TITLE
+	bridge.call(&"eval", "document.title = '%s';" % title, true)
