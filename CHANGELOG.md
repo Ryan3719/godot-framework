@@ -18,6 +18,7 @@ All notable changes to this project are documented in this file. The project fol
 - Capacity limits for threaded resource requests, downloads, HTTP history, and correlation tracking
 - Linux, macOS, and Windows release-export execution tests using the packaged addon and matching Godot templates
 - Single-threaded Web release-export execution in headless Chrome on both supported Godot versions
+- Android release APK export, ephemeral test signing, x86_64 ABI verification, and API 35 emulator execution on both supported Godot versions
 - Size-bounded, checksummed storage envelopes with backup fallback for missing or corrupt primaries
 
 ### Changed
@@ -34,3 +35,4 @@ All notable changes to this project are documented in this file. The project fol
 - Public APIs remain development-tier until the first stable release
 - Godot 4.4 cannot unload mounted PCK files in the same process
 - Resumable downloads, bandwidth throttling, arbitrary script hot reload, and universal networking protocols are not claimed
+- Android coverage is limited to the six enabled default modules and an ephemeral test-signed APK; optional-module mobile integration, AAB or Play workflows, production signing, and iOS remain unverified
