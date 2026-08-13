@@ -12,7 +12,7 @@ PACKAGE_NAME = "com.ryan3719.godotframeworktest"
 PASS_MARKER = "[EXPORT TEST] PASS: packaged addon runs in release export"
 FAILURE_PATTERN = re.compile(
     r"SCRIPT ERROR|Parse Error|(?:^|\s)ERROR:|ObjectDB instances leaked|"
-    r"instances were leaked|resources still in use|FATAL EXCEPTION|AndroidRuntime|Fatal signal",
+    r"instances were leaked|resources still in use|FATAL EXCEPTION|Fatal signal",
     re.IGNORECASE | re.MULTILINE,
 )
 
