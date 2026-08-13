@@ -25,6 +25,9 @@ func _ready() -> void:
 		valid = valid and not ResourceLoader.exists(
 			"res://addons/godot_framework/editor/framework_validation_dock.gd"
 		)
+		valid = valid and not ResourceLoader.exists(
+			"res://addons/godot_framework_android_export_settings/plugin.gd"
+		)
 	if valid:
 		_set_web_result(true)
 		if verify_export:

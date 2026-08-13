@@ -9,7 +9,7 @@ config/features=PackedStringArray("4.4", "GL Compatibility")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_framework/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_framework/plugin.cfg", "res://addons/godot_framework_android_export_settings/plugin.cfg")
 
 [rendering]
 
