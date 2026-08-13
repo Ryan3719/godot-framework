@@ -248,7 +248,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim
           script: python3 tests/verify_android_runtime.py "$RUNNER_TEMP/godot-framework-${{ matrix.godot-version }}.apk" --adb "$ANDROID_HOME/platform-tools/adb" --timeout-seconds 60
 
   package-reproducibility:
