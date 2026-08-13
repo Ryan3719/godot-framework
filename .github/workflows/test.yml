@@ -99,6 +99,7 @@ jobs:
           python3 scripts/package_addon.py --output "$package_path"
           python3 scripts/verify_addon_package.py "$package_path"
           bash tests/verify_addon_package.sh "$package_path" "$(command -v godot)"
+          bash tests/verify_reference_consumer.sh "$package_path" "$(command -v godot)"
           bash tests/verify_linux_export.sh "$package_path" "$(command -v godot)"
           cp "$package_path.sha256" "package-sha-${{ runner.os }}-${{ matrix.godot-version }}.txt"
 

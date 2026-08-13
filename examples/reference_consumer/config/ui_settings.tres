@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="GFUISettings" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_settings.gd" id="1_ui_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_layer_definition.gd" id="2_layer_definition"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_route.gd" id="3_ui_route"]
+[ext_resource type="PackedScene" path="res://ui/reference_view.tscn" id="4_reference_view"]
+
+[sub_resource type="Resource" id="ReferenceLayer"]
+script = ExtResource("2_layer_definition")
+layer_id = &"reference"
+canvas_layer = 1
+blocks_lower_input = false
+
+[sub_resource type="Resource" id="ReferenceRoute"]
+script = ExtResource("3_ui_route")
+route_id = &"reference.status"
+layer_id = &"reference"
+scene = ExtResource("4_reference_view")
+singleton = true
+
+[resource]
+script = ExtResource("1_ui_settings")
+root_name = "FrameworkReferenceUi"
+layers = Array[ExtResource("2_layer_definition")]([SubResource("ReferenceLayer")])
+routes = Array[ExtResource("3_ui_route")]([SubResource("ReferenceRoute")])

@@ -1,0 +1,29 @@
+; Reference consumer project for the Godot Framework addon.
+; Rename this file to project.godot after installing the addon package into this directory.
+
+config_version=5
+
+[application]
+
+config/name="Godot Framework Reference Consumer"
+run/main_scene="res://reference_consumer.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[autoload]
+
+ReferenceProjectSetup="*res://reference_project_setup.gd"
+GodotFramework="*res://addons/godot_framework/runtime/framework_host.gd"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_framework/plugin.cfg")
+
+[godot_framework]
+
+auto_boot=true
+config_path="res://config/reference_framework_config.tres"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

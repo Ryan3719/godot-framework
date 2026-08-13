@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="GFSettingsSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/modules/settings/settings_settings.gd" id="1_settings_settings"]
+
+[resource]
+script = ExtResource("1_settings_settings")
+file_path = "user://reference_consumer/settings.cfg"
+auto_save = true

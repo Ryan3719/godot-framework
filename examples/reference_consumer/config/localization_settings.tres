@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GFLocalizationSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/modules/localization/localization_settings.gd" id="1_localization_settings"]
+
+[resource]
+script = ExtResource("1_localization_settings")
+supported_locales = PackedStringArray("en_US", "zh_CN")
+fallback_locale = "en_US"
+use_system_locale = false

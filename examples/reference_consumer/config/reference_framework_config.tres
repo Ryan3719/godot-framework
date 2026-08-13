@@ -1,0 +1,81 @@
+[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=28 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/core/framework_config.gd" id="1_config"]
+[ext_resource type="Script" path="res://addons/godot_framework/core/module_definition.gd" id="2_definition"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/resource/resource_module.gd" id="3_resource_module"]
+[ext_resource type="Resource" path="res://config/resource_settings.tres" id="4_resource_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/scene/scene_module.gd" id="5_scene_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/storage/storage_module.gd" id="6_storage_module"]
+[ext_resource type="Resource" path="res://config/storage_settings.tres" id="7_storage_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/settings/settings_module.gd" id="8_settings_module"]
+[ext_resource type="Resource" path="res://config/settings_settings.tres" id="9_settings_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/pool/pool_module.gd" id="10_pool_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/state_machine/state_machine_module.gd" id="11_state_machine_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_module.gd" id="12_ui_module"]
+[ext_resource type="Resource" path="res://config/ui_settings.tres" id="13_ui_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/input/input_module.gd" id="14_input_module"]
+[ext_resource type="Resource" path="res://config/input_settings.tres" id="15_input_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/localization/localization_module.gd" id="16_localization_module"]
+[ext_resource type="Resource" path="res://config/localization_settings.tres" id="17_localization_settings"]
+
+[sub_resource type="Resource" id="ModuleResource"]
+script = ExtResource("2_definition")
+declared_id = &"resource"
+module_script = ExtResource("3_resource_module")
+expected_settings_class = &"GFResourceSettings"
+settings = ExtResource("4_resource_settings")
+
+[sub_resource type="Resource" id="ModuleScene"]
+script = ExtResource("2_definition")
+declared_id = &"scene"
+declared_dependencies = Array[StringName]([&"resource"])
+module_script = ExtResource("5_scene_module")
+
+[sub_resource type="Resource" id="ModuleStorage"]
+script = ExtResource("2_definition")
+declared_id = &"storage"
+module_script = ExtResource("6_storage_module")
+expected_settings_class = &"GFStorageSettings"
+settings = ExtResource("7_storage_settings")
+
+[sub_resource type="Resource" id="ModuleSettings"]
+script = ExtResource("2_definition")
+declared_id = &"settings"
+module_script = ExtResource("8_settings_module")
+expected_settings_class = &"GFSettingsSettings"
+settings = ExtResource("9_settings_settings")
+
+[sub_resource type="Resource" id="ModulePool"]
+script = ExtResource("2_definition")
+declared_id = &"pool"
+module_script = ExtResource("10_pool_module")
+
+[sub_resource type="Resource" id="ModuleStateMachine"]
+script = ExtResource("2_definition")
+declared_id = &"state_machine"
+module_script = ExtResource("11_state_machine_module")
+
+[sub_resource type="Resource" id="ModuleUi"]
+script = ExtResource("2_definition")
+declared_id = &"ui"
+module_script = ExtResource("12_ui_module")
+expected_settings_class = &"GFUISettings"
+settings = ExtResource("13_ui_settings")
+
+[sub_resource type="Resource" id="ModuleInput"]
+script = ExtResource("2_definition")
+declared_id = &"input"
+module_script = ExtResource("14_input_module")
+expected_settings_class = &"GFInputSettings"
+settings = ExtResource("15_input_settings")
+
+[sub_resource type="Resource" id="ModuleLocalization"]
+script = ExtResource("2_definition")
+declared_id = &"localization"
+module_script = ExtResource("16_localization_module")
+expected_settings_class = &"GFLocalizationSettings"
+settings = ExtResource("17_localization_settings")
+
+[resource]
+script = ExtResource("1_config")
+modules = Array[ExtResource("2_definition")]([SubResource("ModuleResource"), SubResource("ModuleScene"), SubResource("ModuleStorage"), SubResource("ModuleSettings"), SubResource("ModulePool"), SubResource("ModuleStateMachine"), SubResource("ModuleUi"), SubResource("ModuleInput"), SubResource("ModuleLocalization")])

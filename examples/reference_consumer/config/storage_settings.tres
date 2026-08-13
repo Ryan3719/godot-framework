@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="GFStorageSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/modules/storage/storage_settings.gd" id="1_storage_settings"]
+
+[resource]
+script = ExtResource("1_storage_settings")
+base_directory = "user://reference_consumer/saves"
+file_extension = "save"
+backup_count = 1
+schema_version = 1
+max_file_bytes = 1048576

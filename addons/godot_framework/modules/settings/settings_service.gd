@@ -30,6 +30,10 @@ func load() -> Error:
 
 
 func save() -> Error:
+	var directory_result := DirAccess.make_dir_recursive_absolute(settings.file_path.get_base_dir())
+	if directory_result != OK and directory_result != ERR_ALREADY_EXISTS:
+		operation_failed.emit(&"save", directory_result)
+		return directory_result
 	var result := _config.save(settings.file_path)
 	if result != OK:
 		operation_failed.emit(&"save", result)

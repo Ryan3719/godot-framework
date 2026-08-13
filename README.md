@@ -97,9 +97,9 @@ godot --headless --verbose --path . tests/config_validation_runner.tscn
 godot --headless --verbose --path . tests/performance_runner.tscn
 ```
 
-The test project currently runs 366 assertions plus configuration, performance-smoke, clean-package installation, Linux, macOS, Windows, Android, and browser-executed Web release exports, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. CI uses matching export templates for Godot 4.4.1 and 4.7.1, compares addon package hashes across all three desktop runner operating systems, and treats parse errors, engine errors, browser errors, leaked objects, and resources left in use as failures.
+The test project currently runs 368 assertions plus configuration, performance-smoke, clean-package installation, Linux, macOS, Windows, Android, and browser-executed Web release exports, scene-transition, real PCK-mount, and local HTTP/WebSocket adapter tests. CI uses matching export templates for Godot 4.4.1 and 4.7.1, compares addon package hashes across all three desktop runner operating systems, and treats parse errors, engine errors, browser errors, leaked objects, and resources left in use as failures.
 
-Clean-package installation and export execution use a consumer-project fixture that enables all 14 modules with valid but integration-free settings. It verifies module startup and shutdown, service registration, and framework-owned runtime roots, including a single-threaded Web build in headless Chrome and Android release APK execution on an API 35 x86_64 emulator. Android CI exports an unsigned APK and signs it only with an ephemeral test keystore. This does not claim exported feature integration for project routes, audio playback, input bindings, translation resources, downloads, PCK mounting, or application protocols; threaded Web builds, AAB or Play publishing, production code signing, notarization, iOS, and store submission also remain outside coverage.
+Clean-package installation and export execution use a consumer-project fixture that enables all 14 modules with valid but integration-free settings. It verifies module startup and shutdown, service registration, and framework-owned runtime roots, including a single-threaded Web build in headless Chrome and Android release APK execution on an API 35 x86_64 emulator. A separate [reference consumer](examples/reference_consumer) installs the built package into a project that owns its configuration, UI route, input action, translations, settings, and save paths; it verifies those integration paths in headless CI. Android CI exports an unsigned APK and signs it only with an ephemeral test keystore. This does not claim exported feature integration for audio playback, downloads, PCK mounting, or application protocols; threaded Web builds, AAB or Play publishing, production code signing, notarization, iOS, and store submission also remain outside coverage.
 
 ## Documentation
 
@@ -113,6 +113,7 @@ Clean-package installation and export execution use a consumer-project fixture t
 - [Performance](docs/performance.md)
 - [Versioning and API stability](docs/versioning.md)
 - [Upgrading](docs/upgrading.md)
+- [Reference consumer](examples/reference_consumer)
 - [Changelog](CHANGELOG.md)
 
 ## License

@@ -1457,6 +1457,18 @@ func _test_settings_service() -> void:
 	_expect(reloaded.load() == OK, "Settings file reloads")
 	_expect(is_equal_approx(float(reloaded.get_value(&"audio", &"volume")), 0.75), "Setting value round-trips")
 	DirAccess.remove_absolute(service_settings.file_path)
+	var nested_settings := GFSettingsSettings.new()
+	nested_settings.file_path = "user://gf_framework_tests/settings/nested.cfg"
+	nested_settings.auto_save = true
+	var nested_service := GFSettingsService.new(nested_settings)
+	_expect(
+		nested_service.set_value(&"reference", &"configured", true) == OK,
+		"Settings create a configured nested user directory before autosaving",
+	)
+	_expect(FileAccess.file_exists(nested_settings.file_path), "Nested settings autosave writes its configured path")
+	DirAccess.remove_absolute(nested_settings.file_path)
+	DirAccess.remove_absolute(nested_settings.file_path.get_base_dir())
+	DirAccess.remove_absolute(nested_settings.file_path.get_base_dir().get_base_dir())
 
 
 func _test_storage_service_and_migration() -> void:
