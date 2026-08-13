@@ -9,7 +9,7 @@ import time
 
 
 PACKAGE_NAME = "com.ryan3719.godotframeworktest"
-PASS_MARKER = "[EXPORT TEST] PASS: packaged addon runs in release export"
+PASS_MARKER = "[EXPORT TEST] PASS: packaged addon starts and stops all modules in release export"
 FAILURE_PATTERN = re.compile(
     r"SCRIPT ERROR|Parse Error|(?:^|\s)ERROR:|ObjectDB instances leaked|"
     r"instances were leaked|resources still in use|FATAL EXCEPTION|Fatal signal",

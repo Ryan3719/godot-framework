@@ -26,7 +26,7 @@ FAILURE_PATTERN = re.compile(
 )
 PASS_TITLE = "GF_EXPORT_TEST_PASS"
 FAIL_TITLE = "GF_EXPORT_TEST_FAIL"
-PASS_LOG_MARKER = "[EXPORT TEST] PASS: packaged addon runs in release export"
+PASS_LOG_MARKER = "[EXPORT TEST] PASS: packaged addon starts and stops all modules in release export"
 DIRECT_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 

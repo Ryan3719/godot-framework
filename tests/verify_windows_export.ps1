@@ -65,7 +65,7 @@ try {
     }
 
     $RunOutput = Get-Content $RunLog -Raw
-    if (-not $RunOutput.Contains("[EXPORT TEST] PASS: packaged addon runs in release export")) {
+    if (-not $RunOutput.Contains("[EXPORT TEST] PASS: packaged addon starts and stops all modules in release export")) {
         Get-Content $RunLog
         throw "Windows export runtime marker was not found."
     }

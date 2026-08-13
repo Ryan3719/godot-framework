@@ -1,0 +1,151 @@
+[gd_resource type="Resource" script_class="GFFrameworkConfig" load_steps=43 format=3]
+
+[ext_resource type="Script" path="res://addons/godot_framework/core/framework_config.gd" id="1_config"]
+[ext_resource type="Script" path="res://addons/godot_framework/core/module_definition.gd" id="2_definition"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/resource/resource_module.gd" id="3_resource_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_resource_settings.tres" id="4_resource_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/scene/scene_module.gd" id="5_scene_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/storage/storage_module.gd" id="6_storage_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_storage_settings.tres" id="7_storage_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/settings/settings_module.gd" id="8_settings_module"]
+[ext_resource type="Resource" path="res://addons/godot_framework/config/default_settings_settings.tres" id="9_settings_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/pool/pool_module.gd" id="10_pool_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/state_machine/state_machine_module.gd" id="11_fsm_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_module.gd" id="12_ui_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/ui/ui_settings.gd" id="13_ui_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/audio/audio_module.gd" id="14_audio_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/audio/audio_settings.gd" id="15_audio_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/input/input_module.gd" id="16_input_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/input/input_settings.gd" id="17_input_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/localization/localization_module.gd" id="18_localization_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/localization/localization_settings.gd" id="19_localization_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/download/download_module.gd" id="20_download_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/download/download_settings.gd" id="21_download_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/content/content_module.gd" id="22_content_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/content/content_settings.gd" id="23_content_settings"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/data/table_module.gd" id="24_table_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/connectivity/connectivity_module.gd" id="25_connectivity_module"]
+[ext_resource type="Script" path="res://addons/godot_framework/modules/connectivity/connectivity_settings.gd" id="26_connectivity_settings"]
+
+[sub_resource type="Resource" id="ResourceSettings"]
+script = ExtResource("13_ui_settings")
+
+[sub_resource type="Resource" id="AudioSettings"]
+script = ExtResource("15_audio_settings")
+
+[sub_resource type="Resource" id="InputSettings"]
+script = ExtResource("17_input_settings")
+
+[sub_resource type="Resource" id="LocalizationSettings"]
+script = ExtResource("19_localization_settings")
+supported_locales = PackedStringArray("en")
+fallback_locale = "en"
+use_system_locale = false
+
+[sub_resource type="Resource" id="DownloadSettings"]
+script = ExtResource("21_download_settings")
+base_directory = "user://godot_framework_export_fixture/downloads"
+
+[sub_resource type="Resource" id="ContentSettings"]
+script = ExtResource("23_content_settings")
+base_directory = "user://godot_framework_export_fixture/content"
+require_signature = false
+auto_mount_active = false
+
+[sub_resource type="Resource" id="ConnectivitySettings"]
+script = ExtResource("26_connectivity_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_resource"]
+script = ExtResource("2_definition")
+declared_id = &"resource"
+module_script = ExtResource("3_resource_module")
+expected_settings_class = &"GFResourceSettings"
+settings = ExtResource("4_resource_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_scene"]
+script = ExtResource("2_definition")
+declared_id = &"scene"
+declared_dependencies = Array[StringName]([&"resource"])
+module_script = ExtResource("5_scene_module")
+
+[sub_resource type="Resource" id="ModuleDefinition_storage"]
+script = ExtResource("2_definition")
+declared_id = &"storage"
+module_script = ExtResource("6_storage_module")
+expected_settings_class = &"GFStorageSettings"
+settings = ExtResource("7_storage_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_settings"]
+script = ExtResource("2_definition")
+declared_id = &"settings"
+module_script = ExtResource("8_settings_module")
+expected_settings_class = &"GFSettingsSettings"
+settings = ExtResource("9_settings_settings")
+
+[sub_resource type="Resource" id="ModuleDefinition_pool"]
+script = ExtResource("2_definition")
+declared_id = &"pool"
+module_script = ExtResource("10_pool_module")
+
+[sub_resource type="Resource" id="ModuleDefinition_fsm"]
+script = ExtResource("2_definition")
+declared_id = &"state_machine"
+module_script = ExtResource("11_fsm_module")
+
+[sub_resource type="Resource" id="ModuleDefinition_ui"]
+script = ExtResource("2_definition")
+declared_id = &"ui"
+module_script = ExtResource("12_ui_module")
+expected_settings_class = &"GFUISettings"
+settings = SubResource("ResourceSettings")
+
+[sub_resource type="Resource" id="ModuleDefinition_audio"]
+script = ExtResource("2_definition")
+declared_id = &"audio"
+module_script = ExtResource("14_audio_module")
+expected_settings_class = &"GFAudioSettings"
+settings = SubResource("AudioSettings")
+
+[sub_resource type="Resource" id="ModuleDefinition_input"]
+script = ExtResource("2_definition")
+declared_id = &"input"
+module_script = ExtResource("16_input_module")
+expected_settings_class = &"GFInputSettings"
+settings = SubResource("InputSettings")
+
+[sub_resource type="Resource" id="ModuleDefinition_localization"]
+script = ExtResource("2_definition")
+declared_id = &"localization"
+module_script = ExtResource("18_localization_module")
+expected_settings_class = &"GFLocalizationSettings"
+settings = SubResource("LocalizationSettings")
+
+[sub_resource type="Resource" id="ModuleDefinition_download"]
+script = ExtResource("2_definition")
+declared_id = &"download"
+module_script = ExtResource("20_download_module")
+expected_settings_class = &"GFDownloadSettings"
+settings = SubResource("DownloadSettings")
+
+[sub_resource type="Resource" id="ModuleDefinition_content"]
+script = ExtResource("2_definition")
+declared_id = &"content"
+module_script = ExtResource("22_content_module")
+expected_settings_class = &"GFContentSettings"
+settings = SubResource("ContentSettings")
+
+[sub_resource type="Resource" id="ModuleDefinition_tables"]
+script = ExtResource("2_definition")
+declared_id = &"tables"
+module_script = ExtResource("24_table_module")
+
+[sub_resource type="Resource" id="ModuleDefinition_connectivity"]
+script = ExtResource("2_definition")
+declared_id = &"connectivity"
+module_script = ExtResource("25_connectivity_module")
+expected_settings_class = &"GFConnectivitySettings"
+settings = SubResource("ConnectivitySettings")
+
+[resource]
+script = ExtResource("1_config")
+modules = Array[ExtResource("2_definition")]([SubResource("ModuleDefinition_resource"), SubResource("ModuleDefinition_scene"), SubResource("ModuleDefinition_storage"), SubResource("ModuleDefinition_settings"), SubResource("ModuleDefinition_pool"), SubResource("ModuleDefinition_fsm"), SubResource("ModuleDefinition_ui"), SubResource("ModuleDefinition_audio"), SubResource("ModuleDefinition_input"), SubResource("ModuleDefinition_localization"), SubResource("ModuleDefinition_download"), SubResource("ModuleDefinition_content"), SubResource("ModuleDefinition_tables"), SubResource("ModuleDefinition_connectivity")])

@@ -13,7 +13,7 @@ unzip -q "$package_path" -d "$project_dir"
 
 NO_COLOR=1 "$godot_bin" --headless --editor --quit --path "$project_dir" > "$project_dir/editor.log" 2>&1
 NO_COLOR=1 "$godot_bin" --headless --verbose --path "$project_dir" > "$project_dir/run.log" 2>&1
-grep -F "[PACKAGE TEST] PASS: packaged addon installs with minimal defaults" "$project_dir/run.log"
+grep -F "[PACKAGE TEST] PASS: packaged addon installs and stops all module services" "$project_dir/run.log"
 if grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" "$project_dir/editor.log" "$project_dir/run.log"; then
 	exit 1
 fi

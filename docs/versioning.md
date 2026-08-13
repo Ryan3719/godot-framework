@@ -9,7 +9,7 @@ Godot Framework follows Semantic Versioning: `MAJOR.MINOR.PATCH`.
 - Patch releases fix behavior without intentionally changing documented contracts.
 - Versions ending in `-dev` are unreleased development snapshots and cannot be published by the release workflow.
 
-The supported engine range currently starts at Godot 4.4. CI validates editor/headless behavior plus Linux, macOS, Windows, single-threaded Web, and Android release APK execution on both the minimum version, 4.4.1, and the current compatibility version, 4.7.1. Android execution uses an API 35 x86_64 emulator and an ephemeral test signing key. These exports exercise the clean addon's six-module default runtime boundary; optional-module integration, threaded Web builds, optional-module mobile integration, AAB or Play workflows, production Android signing, and iOS require separate evidence. A future engine version is not supported merely because it parses the project.
+The supported engine range currently starts at Godot 4.4. CI validates editor/headless behavior plus Linux, macOS, Windows, single-threaded Web, and Android release APK execution on both the minimum version, 4.4.1, and the current compatibility version, 4.7.1. Android execution uses an API 35 x86_64 emulator and an ephemeral test signing key. These exports exercise startup and shutdown of all built-in modules in a clean consumer fixture, but not project routes, audio playback, input bindings, translation resources, downloads, PCK mounting, or HTTP/WebSocket protocol adapters. Threaded Web builds, AAB or Play workflows, production Android signing, and iOS require separate evidence. A future engine version is not supported merely because it parses the project.
 
 ## Stability Tiers
 

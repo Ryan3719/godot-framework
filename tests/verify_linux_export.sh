@@ -19,7 +19,7 @@ test -x "$export_dir/godot-framework-test.x86_64"
 	NO_COLOR=1 ./godot-framework-test.x86_64 --headless --verbose > "$project_dir/export-run.log" 2>&1
 )
 
-grep -F "[EXPORT TEST] PASS: packaged addon runs in release export" "$project_dir/export-run.log"
+grep -F "[EXPORT TEST] PASS: packaged addon starts and stops all modules in release export" "$project_dir/export-run.log"
 if grep -E "SCRIPT ERROR|Parse Error|^ERROR:|ObjectDB instances leaked|instances were leaked|resources still in use" \
 	"$project_dir/editor.log" "$project_dir/export.log" "$project_dir/export-run.log"; then
 	exit 1

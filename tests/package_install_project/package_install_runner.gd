@@ -12,10 +12,29 @@ func _ready() -> void:
 		&"settings",
 		&"pool",
 		&"state_machine",
+		&"ui",
+		&"audio",
+		&"input",
+		&"localization",
+		&"download",
+		&"content",
+		&"tables",
+		&"connectivity",
 	]
 	var valid := framework != null and framework.is_booted()
 	valid = valid and framework.modules.ordered_ids() == expected
-	valid = valid and framework.get_service(GFServiceIds.CONNECTIVITY) == null
+	valid = valid and framework.get_service(GFServiceIds.UI) is GFUIService
+	valid = valid and framework.get_service(GFServiceIds.AUDIO) is GFAudioService
+	valid = valid and framework.get_service(GFServiceIds.INPUT) is GFInputService
+	valid = valid and framework.get_service(GFServiceIds.LOCALIZATION) is GFLocalizationService
+	valid = valid and framework.get_service(GFServiceIds.DOWNLOADS) is GFDownloadService
+	valid = valid and framework.get_service(GFServiceIds.CONTENT) is GFContentService
+	valid = valid and framework.get_service(GFServiceIds.TABLES) is GFTableService
+	valid = valid and framework.get_service(GFServiceIds.CONNECTIVITY) is GFConnectivityService
+	valid = valid and framework.get_node_or_null("FrameworkUI") != null
+	valid = valid and framework.get_node_or_null("FrameworkAudio") != null
+	valid = valid and framework.get_node_or_null("FrameworkDownloads") != null
+	valid = valid and framework.get_node_or_null("FrameworkConnectivity") != null
 	var validator := GFFrameworkValidator.new()
 	var config_path := str(ProjectSettings.get_setting(GFFrameworkHost.CONFIG_PATH_SETTING, ""))
 	valid = valid and not validator.has_errors(validator.validate_path(config_path))
@@ -29,12 +48,19 @@ func _ready() -> void:
 			"res://addons/godot_framework_android_export_settings/plugin.gd"
 		)
 	if valid:
+		framework.shutdown()
+		await get_tree().process_frame
+		valid = not framework.is_booted() and framework.services == null
+		valid = valid and framework.get_node_or_null("FrameworkUI") == null
+		valid = valid and framework.get_node_or_null("FrameworkAudio") == null
+		valid = valid and framework.get_node_or_null("FrameworkDownloads") == null
+		valid = valid and framework.get_node_or_null("FrameworkConnectivity") == null
+	if valid:
 		_set_web_result(true)
 		if verify_export:
-			print("[EXPORT TEST] PASS: packaged addon runs in release export")
+			print("[EXPORT TEST] PASS: packaged addon starts and stops all modules in release export")
 		else:
-			print("[PACKAGE TEST] PASS: packaged addon installs with minimal defaults")
-		framework.shutdown()
+			print("[PACKAGE TEST] PASS: packaged addon installs and stops all module services")
 		if not OS.has_feature("web"):
 			get_tree().quit(0)
 		return
